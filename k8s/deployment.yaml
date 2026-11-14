@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kinnow-api
+  namespace: kinnow
+  labels:
+    app: kinnow-api
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kinnow-api
+  template:
+    metadata:
+      labels:
+        app: kinnow-api
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Non-root security (Section 20)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+
+      containers:
+        - name: api
+          image: your-ecr-repo/kinnow-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+
+          env:
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: kinnow-secrets
+                  key: redis-url
+            - name: VLLM_BASE_URL
+              value: "http://kinnow-vllm:8001"
+            - name: MODEL_NAME
+              value: "kinnow-v1"
+            - name: ENV
+              value: "production"
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+
+          # Read-only root filesystem (Section 20)
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: centroids
+              mountPath: /app/data
+              readOnly: true
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: centroids
+          configMap:
+            name: kinnow-centroids
+
+      # Spread across nodes for availability
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: kinnow-api

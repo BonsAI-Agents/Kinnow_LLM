@@ -1,0 +1,63 @@
+groups:
+  - name: kinnow_slo
+    interval: 30s
+    rules:
+
+      # p95 latency > 2s — SLO breach
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(kinnow_request_duration_seconds_bucket{endpoint="/v1/chat"}[5m])
+          ) > 2.0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "p95 latency above 2s SLO"
+          description: "p95={{ $value | printf \"%.2f\" }}s on /v1/chat over last 5m"
+
+      # Error rate > 1%
+      - alert: HighErrorRate
+        expr: |
+          rate(kinnow_requests_total{status=~"5.."}[5m])
+          /
+          rate(kinnow_requests_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API error rate above 1%"
+          description: "Error rate={{ $value | printf \"%.2f%%\" }} over last 5m"
+
+      # Circuit breaker opened
+      - alert: CircuitBreakerOpen
+        expr: increase(kinnow_blocks_total{reason="circuit_open"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker opened — model unreachable"
+          description: "Model inference failing. Circuit breaker tripped."
+
+      # OOS query spike (> 30% of traffic blocked as OOS)
+      - alert: HighOOSRate
+        expr: |
+          rate(kinnow_oos_queries_total[5m])
+          /
+          rate(kinnow_requests_total[5m]) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High out-of-scope query rate (>30%)"
+          description: "Could indicate scraping, abuse, or a misconfigured client."
+
+      # API down
+      - alert: APIDown
+        expr: up{job="kinnow-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kinnow API is down"
+          description: "No scrape data received from kinnow-api for 1 minute."

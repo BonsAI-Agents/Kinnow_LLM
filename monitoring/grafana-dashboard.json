@@ -1,0 +1,100 @@
+{
+  "title": "Kinnow ERP LLM",
+  "uid": "kinnow-v1",
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request Rate (req/sec)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 6 },
+      "targets": [{
+        "expr": "rate(kinnow_requests_total{endpoint=\"/v1/chat\"}[1m])",
+        "legendFormat": "req/sec"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "p95 Latency (seconds)",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 6 },
+      "targets": [{
+        "expr": "histogram_quantile(0.95, rate(kinnow_request_duration_seconds_bucket{endpoint=\"/v1/chat\"}[5m]))",
+        "legendFormat": "p95 latency"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "value": 0, "color": "green" },
+              { "value": 1.5, "color": "yellow" },
+              { "value": 2.0, "color": "red" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Error Rate (%)",
+      "type": "timeseries",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 6 },
+      "targets": [{
+        "expr": "100 * rate(kinnow_requests_total{status=~\"5..\"}[5m]) / rate(kinnow_requests_total[5m])",
+        "legendFormat": "error %"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "Block Rate by Layer",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 6 },
+      "targets": [{
+        "expr": "rate(kinnow_blocks_total[5m])",
+        "legendFormat": "{{layer}} / {{reason}}"
+      }]
+    },
+    {
+      "id": 5,
+      "title": "Model Inference p95 (seconds)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 6 },
+      "targets": [{
+        "expr": "histogram_quantile(0.95, rate(kinnow_model_duration_seconds_bucket[5m]))",
+        "legendFormat": "model p95"
+      }]
+    },
+    {
+      "id": 6,
+      "title": "Active Requests",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 12, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "kinnow_active_requests",
+        "legendFormat": "active"
+      }]
+    },
+    {
+      "id": 7,
+      "title": "OOS Query Rate",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 12, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "rate(kinnow_oos_queries_total[5m])",
+        "legendFormat": "OOS/sec"
+      }]
+    },
+    {
+      "id": 8,
+      "title": "Feedback (thumbs down / 5m)",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 12, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "increase(kinnow_feedback_total{rating=\"down\"}[5m])",
+        "legendFormat": "thumbs down"
+      }]
+    }
+  ]
+}

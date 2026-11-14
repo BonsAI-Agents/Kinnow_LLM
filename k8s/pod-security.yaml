@@ -1,0 +1,50 @@
+# PodSecurityContext — Section 20
+# Applied as a PodSecurityAdmission policy on the kinnow namespace.
+# Enforces: non-root user, read-only root filesystem, no privilege escalation,
+# all capabilities dropped.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kinnow
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+
+---
+# Explicit PodSecurityPolicy for clusters that still use PSP (pre-1.25)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: kinnow-restricted
+  namespace: kinnow
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - emptyDir
+    - configMap
+    - secret
+    - projected
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: MustRunAsNonRoot
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+  fsGroup:
+    rule: MustRunAs
+    ranges:
+      - min: 1000
+        max: 65535
+  readOnlyRootFilesystem: true

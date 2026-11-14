@@ -1,0 +1,59 @@
+# K8s NetworkPolicy — Section 20
+# kinnow-api pods may only talk to: Redis, vLLM, and the ingress controller.
+# All other egress/ingress is denied by default.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kinnow-api-netpol
+  namespace: kinnow
+spec:
+  podSelector:
+    matchLabels:
+      app: kinnow-api
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow traffic from the ingress controller only
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+    # Allow Prometheus scraping from monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8000
+
+  egress:
+    # Allow outbound to Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app: kinnow-redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow outbound to vLLM inference server
+    - to:
+        - podSelector:
+            matchLabels:
+              app: kinnow-vllm
+      ports:
+        - protocol: TCP
+          port: 8001
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
