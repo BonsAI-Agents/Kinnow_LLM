@@ -1,0 +1,82 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "serve/**"
+      - "guardrails/**"
+      - "Dockerfile"
+      - "requirements.txt"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.ecr-login.outputs.registry }}/kinnow-api
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-canary:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Canary deploy (5% traffic)
+        run: |
+          SHA_TAG=$(echo '${{ needs.build-and-push.outputs.image-tag }}' | tr ',' '\n' | grep 'sha-' | head -1)
+          kubectl set image deployment/kinnow-api api=${SHA_TAG} -n kinnow
+          kubectl rollout status deployment/kinnow-api -n kinnow --timeout=120s
+
+      - name: Wait 5 minutes and check SLOs
+        run: |
+          sleep 300
+          # Check error rate and latency via Prometheus
+          python scripts/check_slos.py --prometheus-url $PROMETHEUS_URL
+        env:
+          PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
+
+  promote-production:
+    needs: deploy-canary
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Scale to 100% traffic
+        run: |
+          kubectl scale deployment/kinnow-api --replicas=2 -n kinnow
+          kubectl rollout status deployment/kinnow-api -n kinnow --timeout=120s
+          echo "Deployment complete."

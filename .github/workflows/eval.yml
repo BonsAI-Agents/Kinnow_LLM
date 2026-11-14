@@ -1,0 +1,43 @@
+name: Eval Gate
+
+# Runs after a new model adapter is pushed to HuggingFace.
+# Blocks merge if the model scores below baseline on the eval suite.
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: "HuggingFace model ID to evaluate"
+        required: true
+        default: "KaraPatelDev/kinnow-v1"
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run guardrail eval suite
+        run: python eval/eval_guardrails.py
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+      - name: Run model quality eval
+        run: python eval/eval_model.py --model-id ${{ inputs.model_id }}
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+
+      - name: Upload eval results
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: eval/results/
