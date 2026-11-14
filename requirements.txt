@@ -1,0 +1,32 @@
+# Core serving
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.8.2
+httpx==0.27.2
+
+# Redis (session management + rate limiting)
+redis==5.0.8
+
+# ML inference
+vllm==0.6.1          # production serving (GPU required)
+torch==2.4.1
+transformers==4.46.1
+peft==0.13.2
+trl==0.11.4
+accelerate==0.34.2
+bitsandbytes==0.44.1
+sentencepiece==0.2.0
+protobuf==5.28.2
+
+# Embeddings (Layer 2 classifier)
+sentence-transformers==3.1.1
+numpy==1.26.4
+
+# Quantization (Section 8b)
+autoawq==0.2.6
+
+# Monitoring
+prometheus-client==0.21.0
+
+# Utilities
+python-dotenv==1.0.1
