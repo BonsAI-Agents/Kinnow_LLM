@@ -56,3 +56,6 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Graphify generated output (rebuild with /graphify . --update)
+graphify-out/
