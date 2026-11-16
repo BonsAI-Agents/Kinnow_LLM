@@ -6,6 +6,10 @@ questions in English and Hindi, and refuses everything outside that scope.
 
 Built to the blueprint in `kinnow-production-plan-v1.md`.
 
+> 📖 **New to this codebase?** Start with **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — a complete
+> walkthrough of the request flow, all four guardrail layers, the training pipeline, the ops
+> surface, and the known sharp edges.
+
 | Target | Value |
 |---|---|
 | Base model | `Qwen/Qwen2.5-7B-Instruct` (Apache 2.0) |
@@ -21,6 +25,7 @@ Built to the blueprint in `kinnow-production-plan-v1.md`.
 
 ```
 Kinnow_LLM/
+├── ARCHITECTURE.md    complete codebase walkthrough (read this first)
 ├── guardrails/        4-layer guardrail pipeline (the safety core)
 │   ├── layer1_system_prompt.py     server-side prompt lock + history sanitisation
 │   ├── layer2_classifier.py        keyword → embedding input classifier
