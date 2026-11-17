@@ -12,7 +12,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-VALID_DOMAINS = {"GST", "PAYROLL", "INVOICE", "ERP"}
+VALID_DOMAINS = {"GST", "PAYROLL", "INVOICE", "ERP", "REFUSAL"}
 MIN_PROMPT = 10
 MAX_PROMPT = 300
 MIN_COMPLETION = 30

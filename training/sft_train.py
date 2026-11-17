@@ -11,8 +11,15 @@ Env vars required:
 """
 
 import os
+import sys
 import json
 from pathlib import Path
+
+# Train with the exact system prompt the server sends (guardrails Layer 1).
+# Plan 4e: "Never train without the system prompt" - otherwise train/serve differ
+# and the scope-refusal behaviour does not transfer.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from guardrails.layer1_system_prompt import PRODUCTION_SYSTEM_PROMPT  # noqa: E402
 
 import torch
 from datasets import Dataset
@@ -40,6 +47,7 @@ def load_jsonl(path: str) -> list[dict]:
 def format_example(ex: dict, tokenizer) -> str:
     """Format as chat template for Qwen2.5."""
     messages = [
+        {"role": "system", "content": PRODUCTION_SYSTEM_PROMPT},
         {"role": "user", "content": ex["prompt"]},
         {"role": "assistant", "content": ex["completion"]},
     ]
