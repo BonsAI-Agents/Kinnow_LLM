@@ -34,6 +34,11 @@ def build_and_save(train_path: str, output_path: str = 'data/centroids.npy'):
             if not line:
                 continue
             obj = json.loads(line)
+            # Centroids describe what IN-scope queries look like. REFUSAL rows are
+            # out-of-scope prompts: as a centroid they would make off-topic queries
+            # score as "similar to a domain" and pass Layer 2.
+            if obj['domain'] == 'REFUSAL':
+                continue
             by_domain[obj['domain']].append(obj['prompt'])
 
     print(f"Building centroids for {len(by_domain)} domains:")
