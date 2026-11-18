@@ -22,7 +22,8 @@ from fastapi import FastAPI
 from prometheus_client import make_asgi_app
 
 from serve.auth import load_api_keys
-from serve.redis_client import init_redis, close_redis
+from serve.redis_client import init_redis, close_redis, get_redis
+from serve.rate_limiter import RedisRateLimiter
 from serve.vllm_client import init_vllm_client, close_vllm_client, generate
 from serve.middleware import RequestLoggingMiddleware
 from serve.routes.chat import router as chat_router, set_pipeline
@@ -64,7 +65,8 @@ async def lifespan(app: FastAPI):
     async def model_fn(messages):
         return await cb.call(generate(messages))
 
-    pipeline = KinnowGuardrailPipeline(model_fn=model_fn)
+    # Off-topic rate-limit state lives in Redis so every replica enforces the same limit.
+    pipeline = KinnowGuardrailPipeline(model_fn=model_fn, rate_limiter=RedisRateLimiter(get_redis))
     set_pipeline(pipeline)
     print("  ✓ Guardrail pipeline initialized")
     print("  → Server ready\n")

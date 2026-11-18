@@ -7,28 +7,21 @@ Execution order:
 Refusal anomaly tracker (Section 21f): rate-limits users who repeatedly probe OOS topics.
 """
 
-import time
-from collections import defaultdict
-
 from .layer4_injection import sanitize_input, detect_injection
 from .layer2_classifier import classify_query
 from .layer1_system_prompt import build_messages, sanitize_history
 from .layer3_output_validator import validate_output_v2
+from .rate_limit import InMemoryRateLimiter, OOS_BLOCK_THRESHOLD
 
-# Refusal anomaly config (Section 21f)
-_OOS_WINDOW_SECONDS = 300        # 5-minute sliding window
-_OOS_BLOCK_THRESHOLD = 10        # block after 10 OOS queries in window
-_RATE_LIMIT_DURATION = 600       # 10-minute cooldown after block
-
-# In-memory tracker: {user_id: [timestamps of OOS events]}
-_oos_tracker: dict[str, list[float]] = defaultdict(list)
-_rate_limited_until: dict[str, float] = {}
+# Default limiter: in-process and bounded. The API passes a Redis-backed one so the limit is
+# shared across replicas (serve/rate_limiter.py).
+_default_limiter = InMemoryRateLimiter()
 
 
 def reset_oos_tracker() -> None:
-    """Clear rate-limit state. Call in test setup to avoid inter-test pollution."""
-    _oos_tracker.clear()
-    _rate_limited_until.clear()
+    """Clear the default limiter's state. Call in test setup to avoid inter-test pollution."""
+    _default_limiter.reset()
+
 
 REFUSAL_RESPONSE = (
     "I'm Kinnow's ERP assistant. I can only help with GST, payroll, "
@@ -54,8 +47,9 @@ class KinnowGuardrailPipeline:
     Pass a `model_fn` callable: fn(messages: list[dict]) -> str
     """
 
-    def __init__(self, model_fn):
+    def __init__(self, model_fn, rate_limiter=None):
         self.model_fn = model_fn
+        self._limiter = rate_limiter or _default_limiter
 
     async def process(self, query: str, history: list[dict], user_id: str = 'anonymous') -> dict:
         """
@@ -75,7 +69,7 @@ class KinnowGuardrailPipeline:
             return self._blocked_response(INJECTION_RESPONSE, 'injection')
 
         # --- Refusal anomaly check (Section 21f) ---
-        if self._is_rate_limited(user_id):
+        if await self._limiter.is_limited(user_id):
             return self._blocked_response(RATE_LIMIT_RESPONSE, 'rate_limited')
 
         # --- Layer 2: Input classification ---
@@ -86,7 +80,8 @@ class KinnowGuardrailPipeline:
             return self._clarification_response(classification['clarification'])
 
         if decision == 'block':
-            self._record_oos_event(user_id)
+            if await self._limiter.record(user_id):
+                self._log_security('rate_limit_applied', user_id, f'{OOS_BLOCK_THRESHOLD} OOS in window')
             self._log_security('oos_blocked', user_id, classification.get('reason', ''))
             return self._blocked_response(REFUSAL_RESPONSE, 'oos_query')
 
@@ -152,27 +147,6 @@ class KinnowGuardrailPipeline:
             'block_reason': None,
             'messages_sent': messages,
         }
-
-    # --- Refusal anomaly tracker (Section 21f) ---
-
-    def _record_oos_event(self, user_id: str) -> None:
-        now = time.time()
-        events = self._oos_tracker_for(user_id)
-        events.append(now)
-        # Prune events outside the window
-        _oos_tracker[user_id] = [t for t in events if now - t <= _OOS_WINDOW_SECONDS]
-
-        if len(_oos_tracker[user_id]) >= _OOS_BLOCK_THRESHOLD:
-            _rate_limited_until[user_id] = now + _RATE_LIMIT_DURATION
-            _oos_tracker[user_id] = []
-            self._log_security('rate_limit_applied', user_id, f'{_OOS_BLOCK_THRESHOLD} OOS in window')
-
-    def _is_rate_limited(self, user_id: str) -> bool:
-        limit_until = _rate_limited_until.get(user_id, 0)
-        return time.time() < limit_until
-
-    def _oos_tracker_for(self, user_id: str) -> list[float]:
-        return _oos_tracker[user_id]
 
     # --- Logging ---
 

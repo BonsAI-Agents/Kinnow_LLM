@@ -20,6 +20,7 @@ class FakeRedis:
         self.ttls: dict[str, int] = {}
         self.lists: dict[str, list[str]] = {}
         self.fail_ping = False
+        self.fail_incr = False
         self.closed = False
 
     async def ping(self):
@@ -39,6 +40,24 @@ class FakeRedis:
 
     async def ltrim(self, key, start, stop):
         self.lists[key] = self.lists.get(key, [])[start:stop + 1]
+
+    async def incr(self, key):
+        if self.fail_incr:
+            raise ConnectionError("redis down")
+        self.store[key] = int(self.store.get(key, 0)) + 1
+        return self.store[key]
+
+    async def expire(self, key, seconds):
+        self.ttls[key] = seconds
+
+    async def exists(self, key):
+        if self.fail_incr:
+            raise ConnectionError("redis down")
+        return 1 if key in self.store else 0
+
+    async def delete(self, key):
+        self.store.pop(key, None)
+        self.ttls.pop(key, None)
 
     async def aclose(self):
         self.closed = True

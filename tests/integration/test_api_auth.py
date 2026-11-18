@@ -127,3 +127,31 @@ class TestSessionIsolation:
         assert limited["block_reason"] == "rate_limited"
         other = self.send(app_client, SECOND_KEY, IN_SCOPE).json()
         assert other["blocked"] is False
+
+
+class TestRateLimitIsSharedThroughRedis:
+    """The app builds its pipeline with the Redis limiter, so replicas share the off-topic counter."""
+
+    def test_the_app_pipeline_uses_the_redis_limiter(self, monkeypatch, fake_redis, tmp_path):
+        from serve.rate_limiter import RedisRateLimiter
+        for name in ("init_redis", "close_redis", "init_vllm_client", "close_vllm_client"):
+            monkeypatch.setattr(appmod, name, _noop)
+        monkeypatch.setattr(appmod, "CENTROIDS_PATH", str(tmp_path / "missing.npy"))
+        with TestClient(appmod.app) as c:
+            assert isinstance(chat_routes.get_pipeline()._limiter, RedisRateLimiter)
+            c.post("/v1/chat", json={"session_id": "s1", "message": "What is the weather in Mumbai today?"},
+                   headers=bearer(TEST_API_KEY))
+        assert f"rl:oos:count:{owner_id(TEST_API_KEY)}:s1" in fake_redis.store
+
+    def test_ten_off_topic_questions_limit_the_caller_through_redis(self, monkeypatch, fake_redis, tmp_path):
+        for name in ("init_redis", "close_redis", "init_vllm_client", "close_vllm_client"):
+            monkeypatch.setattr(appmod, name, _noop)
+        monkeypatch.setattr(appmod, "CENTROIDS_PATH", str(tmp_path / "missing.npy"))
+        with TestClient(appmod.app) as c:
+            for _ in range(10):
+                c.post("/v1/chat", json={"session_id": "s1", "message": "What is the weather in Mumbai today?"},
+                       headers=bearer(TEST_API_KEY))
+            r = c.post("/v1/chat", json={"session_id": "s1", "message": "What is the weather in Mumbai today?"},
+                       headers=bearer(TEST_API_KEY))
+        assert r.json()["block_reason"] == "rate_limited"
+        assert f"rl:oos:limited:{owner_id(TEST_API_KEY)}:s1" in fake_redis.store
