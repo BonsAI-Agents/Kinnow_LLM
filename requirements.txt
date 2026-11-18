@@ -22,7 +22,7 @@ redis==8.0.1
 sentence-transformers==5.6.1
 torch==2.13.0
 transformers==5.13.1
-numpy==2.4.6
+numpy==2.5.4
 
 # Monitoring
 prometheus-client==0.25.0
