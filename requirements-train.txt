@@ -1,0 +1,19 @@
+# Training stack (Kaggle / Colab only): training/sft_train.py, dpo_train.py, merge_adapter.py.
+#
+# STANDALONE: install this file on its own, NOT together with requirements.txt. It pins
+# the transformers 4.x / trl 0.11 / peft 0.13 generation that training/*.py was written
+# against; requirements.txt uses transformers 5.x for the API.
+# Not shipped in the Docker image and not scanned by CI's Trivy step (it only reads
+# requirements.txt), so these older pins carry known CVEs: use on ephemeral machines only
+# and do not upgrade without re-running the training scripts.
+# AWQ quantisation needs a different torch and lives in requirements-quantize.txt.
+
+torch==2.4.1
+transformers==4.46.1
+peft==0.13.2
+trl==0.11.4
+accelerate==0.34.2
+bitsandbytes==0.44.1
+sentencepiece==0.2.0
+protobuf==5.28.2
+numpy==1.26.4

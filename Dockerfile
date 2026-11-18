@@ -7,6 +7,10 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
+# CPU-only torch: the API only runs a small embedding model; the default Linux wheel
+# pulls in several GB of CUDA libraries. (vLLM runs in its own GPU container.)
+ENV PIP_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
+
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir --prefix=/install -r requirements.txt

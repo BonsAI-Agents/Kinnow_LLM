@@ -9,6 +9,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # CPU-only torch: the API only runs a small embedding model, and the default
+      # Linux wheel drags in several GB of CUDA libraries.
+      PIP_EXTRA_INDEX_URL: https://download.pytorch.org/whl/cpu
     steps:
       - uses: actions/checkout@v4
 
