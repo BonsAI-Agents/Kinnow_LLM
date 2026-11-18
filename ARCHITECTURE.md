@@ -101,7 +101,7 @@ result = await get_pipeline().process(query=..., history=..., user_id=...)
 ```
 
 > **Why this matters:** `guardrails/` is 100% importable with zero infrastructure.
-> That is why all 68 tests run in seconds with **no GPU, no Redis, and no model**.
+> That is why all 299 tests run in seconds with **no GPU, no Redis, and no model**.
 
 ---
 
@@ -139,7 +139,7 @@ result = await get_pipeline().process(query=..., history=..., user_id=...)
 | 16 | `data/FORMAT.md` | 146 | Read before touching any data work |
 | 17 | `scripts/validate_data.py` | 142 | The gatekeeper — schema, dupes, uncertainty phrases, language |
 | 18 | `scripts/split_data.py` | 75 | Stratified 90/10 by domain, seed 42 |
-| 19 | `scripts/build_centroids.py` | 62 | Produces `data/centroids.npy` for Layer 2 |
+| 19 | `scripts/build_centroids.py` | 62 | Produces `data/centroids.npz` for Layer 2 |
 | 20 | `training/sft_train.py` | 143 | QLoRA config, LoRA hyper-parameters |
 | 21 | `training/dpo_train.py` | 103 | Preference pairs, β, frozen reference model |
 | 22 | `training/merge_adapter.py` | 52 | LoRA → standalone weights |
@@ -157,7 +157,7 @@ result = await get_pipeline().process(query=..., history=..., user_id=...)
 | 29 | `k8s/*.yaml` | Deployment, Service, NetworkPolicy, PodSecurity |
 | 30 | `monitoring/*.yml`, `monitoring/grafana-dashboard.json` | Scraping, alerts, dashboards |
 | 31 | `.github/workflows/{ci,eval,deploy}.yml` | Lint+test, eval gate, canary deploy |
-| 32 | `tests/unit/*`, `tests/integration/*`, `tests/load/*` | 68 tests + Locust scenarios |
+| 32 | `tests/unit/*`, `tests/integration/*`, `tests/load/*` | 299 tests + Locust scenarios |
 | 33 | `README.md`, `CHECKLIST.md` | Status and go-live sign-off |
 
 ---
@@ -179,9 +179,9 @@ flowchart TD
     RL -->|locked| BLOCK_RL["🚫 blocked: rate_limited"]
     RL -->|ok| L2{"<b>LAYER 2</b><br/>scope classifier<br/>~2.5ms"}
 
-    L2 -->|score ≥ 0.65| L1
-    L2 -->|0.45 – 0.65| CLARIFY["💬 clarification_requested<br/><i>no model</i>"]
-    L2 -->|score < 0.45| BLOCK_OOS["🚫 blocked: oos_query"]
+    L2 -->|score ≥ 0.50 (0.35 with an ERP keyword)| L1
+    L2 -->|0.35 – 0.50| CLARIFY["💬 clarification_requested<br/><i>no model</i>"]
+    L2 -->|score < 0.35| BLOCK_OOS["🚫 blocked: oos_query"]
 
     L1["<b>LAYER 1</b> · prompt lock<br/>sanitize_history → build_messages"]
     L1 --> MODEL["<b>MODEL</b> · vLLM via circuit breaker<br/>temp 0.1 · max_tokens 512"]
@@ -213,18 +213,21 @@ flowchart TD
 ### 4.1 Entry — `serve/middleware.py`
 
 ```python
-# middleware.py:19-34
+# middleware.py
 request_id = str(uuid.uuid4())
 request.state.request_id = request_id
 
 ACTIVE_REQUESTS.inc()
 t0 = time.perf_counter()
-response = await call_next(request)
-elapsed = time.perf_counter() - t0
-ACTIVE_REQUESTS.dec()
+try:
+    response = await call_next(request)
+except Exception:
+    self._record(request, request_id, endpoint, 500, time.perf_counter() - t0)   # still counted
+    raise
+finally:
+    ACTIVE_REQUESTS.dec()          # always released, even when the request raises
 
-REQUEST_COUNT.labels(endpoint=endpoint, status=status).inc()
-LATENCY.labels(endpoint=endpoint).observe(elapsed)
+self._record(request, request_id, endpoint, response.status_code, time.perf_counter() - t0)
 ```
 
 Every response also carries an `X-Request-ID` header (`middleware.py:45`).
@@ -322,8 +325,11 @@ Cosine similarity against one centroid per domain, built offline by `scripts/bui
 **Step 3 — decision** (`classify_query`, line 147):
 
 ```python
-CLASSIFIER_THRESHOLD_PASS    = 0.65   # ≥ 0.65 → pass
-CLASSIFIER_THRESHOLD_CLARIFY = 0.45   # 0.45–0.65 → clarify
+CLASSIFIER_THRESHOLD_PASS            = 0.50   # ≥ 0.50 → pass
+CLASSIFIER_THRESHOLD_CLARIFY         = 0.35   # 0.35–0.50 → clarify
+CLASSIFIER_THRESHOLD_PASS_KEYWORD    = 0.35   # the same two cutoffs when the query contains an ERP keyword
+CLASSIFIER_THRESHOLD_CLARIFY_KEYWORD = 0.20
+HINDI_THRESHOLD_OFFSET               = 0.10   # every cutoff is lowered by this for Devanagari queries
 
 # ...final fallback:
 # Below clarify threshold — block. When in doubt, block.
@@ -635,41 +641,44 @@ git push main
 
 ## 9. Known sharp edges
 
-Real observations from reading the code — not hypotheticals. Listed roughly by severity.
+The first reading of this codebase found 14 problems. All were addressed on 2026-11-18; this section records what each was and what changed, then lists what is still true. Each fix has tests.
 
-### 9.1 Correctness & robustness
+### 9.1 What was found and what was done
 
-| # | Location | Issue |
+| # | Was | Now |
 |---|---|---|
-| 1 | `serve/middleware.py:25-28` | `ACTIVE_REQUESTS.dec()` is **not** in a `finally`. If `call_next` raises, the Prometheus gauge permanently leaks upward. One bad exception inflates `kinnow_active_requests` forever. |
-| 2 | `guardrails/pipeline.py:105-121` | `output_too_short` and `output_too_long` issues fall through **every** branch and land on `_success_response(...)`. The length bounds in `layer3_output_validator.py:107-110` are therefore **never enforced**. Only `oos_response`, `pii_detected`, and `invalid_gst_rate` are acted on. |
-| 3 | `guardrails/layer3_output_validator.py:105,142` | `check_pii(text)` runs **twice** per validation (7 regexes each over a 4000-char string). Pure waste. |
-| 4 | `serve/routes/chat.py:71` | `BLOCK_COUNT` is only incremented when `result['blocked']` is true, but `_layer_from_reason` (`:96`) maps `'clarification_requested'` → `layer2`. Clarifications are **invisible** in the metrics. |
-| 5 | `guardrails/pipeline.py:167-168` | `_oos_tracker_for` touches a `defaultdict`, so every request creates an entry keyed by a **client-supplied** `session_id`. Unbounded memory growth from arbitrary ids. |
-| 6 | `serve/` (whole dir) | **No authentication anywhere.** A grep for `auth \| api_key \| Authorization \| bearer \| jwt \| Depends` returns zero matches. Combined with #5, `session_id` is fully client-controlled — `session_get(session_id)` at `chat.py:56` reads *any* user's conversation history if you know or guess their id. Session fixation + history disclosure. |
-| 7 | `guardrails/pipeline.py:24` + `k8s/deployment.yaml:10` | The rate limiter is **per-process**, but the deployment sets `replicas: 2`. Each pod keeps its own counter → the effective threshold is 10 *per pod*, and the `user_id` limit can be bypassed by load-balancer luck. |
-| 8 | `serve/app.py:52` | `np.load(..., allow_pickle=True)` — pickle deserialisation is arbitrary code execution. The mounted ConfigMap is the trust boundary. |
-| 9 | `guardrails/layer2_classifier.py:84-87` | The embedding model loads **lazily on the first request** that reaches the embedding path. That request pays a multi-second model-load latency. It is never warmed at startup, despite `app.py:56` claiming so. |
+| 1 | `ACTIVE_REQUESTS.dec()` was not in a `finally`: one exception inflated the gauge forever | `try/finally` in `serve/middleware.py`; unhandled errors are also counted as 500 |
+| 2 | `output_too_short` / `output_too_long` were computed but never acted on | The pipeline blocks them (`output_length`, layer 3) |
+| 3 | `check_pii` ran twice per validation | Runs once; `validate_output` returns the hits and v2 reuses them |
+| 4 | Clarifications were invisible in `kinnow_blocks_total` | Counted (`reason=clarification_requested`), but not as out-of-scope queries |
+| 5 | The in-memory tracker grew with every client-supplied id | Bounded (stale ids pruned, at most 10,000 tracked); the Redis limiter's keys all expire |
+| 6 | No authentication; `session_id` was client-controlled, so history could be read by guessing an id | `serve/auth.py`: Bearer API keys (`API_KEY_PROD`, plus `API_KEY_NEW` while rotating). `/v1/chat` and `/v1/feedback` require one; sessions and rate-limit state are namespaced per key. `/health`, `/ready`, `/metrics` stay open |
+| 7 | The rate limiter was per pod, so with 2 replicas the limit was 10 per pod | `serve/rate_limiter.py`: counters in Redis, shared by every replica; falls back to the in-process limiter if Redis errors |
+| 8 | Centroids were loaded with `np.load(allow_pickle=True)`: arbitrary code execution from the mounted file | Centroids are a plain `.npz` loaded with `allow_pickle=False`; the old pickled `.npy` is refused with a message to rebuild |
+| 9 | The embedding model loaded lazily on the first request that needed it | Loaded at startup when centroids are present; a failed load stops the server becoming ready. The image now contains the model (see below) |
+| 10 | `start_vllm.sh` was referenced but did not exist | `scripts/start_vllm.sh` (plan section 8c) |
+| 11 | The README served `/models/kinnow-v1-awq-4bit` but the quantiser writes `models/kinnow-v1-awq` | README calls `scripts/start_vllm.sh`, which defaults to the real path |
+| 12 | `CHECKLIST.md` claimed the API deployment requests a GPU | Corrected: vLLM runs separately, the API pod needs none |
+| 13 | `_print_results` was said to print twice on `--fail-fast` | Not reproducible (the branch exits straight after printing). The real flaw was that fail-fast printed partial rates as if complete; it is now labelled PARTIAL |
+| 14 | `eval_model.py` omitted the system prompt, so the gate measured a different configuration from production | It sends the production system prompt; the stale "12%" packaged-food expectation was removed |
 
-### 9.2 Doc & path drift
+### 9.2 Found while fixing
 
-| # | Location | Issue |
-|---|---|---|
-| 10 | `serve/vllm_client.py:3`, `docker-compose.yml:5` | Both reference `start_vllm.sh` — **that file does not exist** in the repo. |
-| 11 | `README.md:126` vs `training/quantize_awq.py:16` | README serves `--model /models/kinnow-v1-awq-4bit`; the training script writes to `models/kinnow-v1-awq`. **The README's vLLM command will fail.** |
-| 12 | `CHECKLIST.md:72` | Claims the K8s deployment has a "GPU request" — `k8s/deployment.yaml` has none. (Correct, since vLLM runs separately, but the checklist is wrong.) |
-| 13 | `eval/eval_guardrails.py:101-111` | `_print_results()` is called inside the `fail_fast` branch, then again at `:203` → duplicate output on failure. |
-| 14 | `eval/eval_model.py:106-109` | Evaluates with **only a user message** — no system prompt, no history. The gate therefore measures the bare fine-tune, not the production configuration. The score is not representative of production quality. |
+- **Layer 2 thresholds and keywords** (see section 5): the plan's 0.65 / 0.45 cutoffs and several over-broad keywords refused 12.6% of legitimate queries. Recalibrated on held-out data; details are in the comment above the constants in `guardrails/layer2_classifier.py`.
+- **Circuit breaker**: it counted failures over its whole lifetime (not consecutively), leaked an un-awaited coroutine on every rejected call, and its 503 could never be returned because the pipeline swallowed `circuit_open`. All three fixed.
+- **Layer 3 GST rates**: the valid-rate set still contained the abolished 12% and 28% slabs and lacked the CGST/SGST half rates, so correct answers about composition or CGST 2.5% got a spurious caveat.
+- **Dependencies**: `requirements.txt` could not be installed (a `torch` pin conflicted with `vllm`) and carried 28 HIGH/CRITICAL CVEs. It now holds only the API runtime; the training and quantisation stacks live in `training/requirements-*.txt`.
+- **Embedding model in a read-only pod**: the pod's root filesystem is read-only, so a lazily downloaded model could not be cached. The Docker image now bakes the model in and runs offline.
+- **`eval/eval_guardrails.py`** could not import `guardrails` when run as `python eval/eval_guardrails.py`, and it ran keyword-only, which flattered the result. Both fixed.
+- **Deploy workflow** did not wait for CI and promoted to production automatically. It now waits for CI on the same commit, and promotion is a separate manually triggered workflow.
 
-### 9.3 Suggested fix order
+### 9.3 Still true
 
-1. **#1** gauge leak — one-line `try/finally`
-2. **#2** length bounds never enforced — add explicit branches
-3. **#6** no auth + client-controlled `session_id` — the only security-relevant item
-4. **#11** broken README vLLM path — trivial, breaks first-run experience
-5. **#7** rate limiter per-pod — move counter to Redis
-6. **#3, #4, #5, #9** — cleanups
-7. **#13, #14** — test-harness correctness
+- **Authentication identifies a client, not a person.** All end users of one client share its key; per-user identity would need a different design. `/metrics` is unauthenticated, as Prometheus needs it, and is protected only by the NetworkPolicy.
+- **The Redis rate limit is a fixed window** that starts at a user's first off-topic query, slightly coarser than the in-process sliding window.
+- **Subtle off-topic questions pass Layer 2.** Personal business advice, legal disputes and similar questions cannot be separated from ERP questions by keywords or embeddings; about 1 in 5 of the subtle cases in the golden set get through and depend on the trained model's refusal behaviour and Layer 3.
+- **The deploy pipeline has never run end to end.** There is no cluster, AWS credentials or Prometheus URL configured, and the workflows contain no step that sets up cluster credentials (no kubeconfig).
+- **Required-reviewer protection is unavailable** for private repositories on this GitHub plan, so the production gate is the manual promotion workflow.
 
 ---
 
@@ -798,7 +807,7 @@ A request enters `serve/middleware.py`, gets an ID and metrics, hits `serve/rout
 |---|---|---|
 | `validate_data.py` | 142 | Schema + quality gate on training JSONL |
 | `split_data.py` | 75 | Stratified 90/10 train/val split |
-| `build_centroids.py` | 62 | Build `data/centroids.npy` for Layer 2 |
+| `build_centroids.py` | 62 | Build `data/centroids.npz` for Layer 2 |
 | `check_slos.py` | 99 | Canary SLO checker against Prometheus |
 | `export_feedback.py` | 70 | Drain the human review queue |
 | `prepare_v2_data.py` | 86 | Merge reviewed feedback into v2 training data |
@@ -846,8 +855,10 @@ A request enters `serve/middleware.py`, gets an ID and metrics, hits `serve/rout
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `VLLM_BASE_URL` | yes | `http://localhost:8001` | Address of the vLLM inference server |
-| `REDIS_URL` | yes | `redis://localhost:6379/0` | Session history and feedback queue |
-| `CENTROIDS_PATH` | no | `data/centroids.npy` | Domain centroid artefact |
+| `REDIS_URL` | yes | `redis://localhost:6379/0` | Session history, feedback queue and the shared rate-limit counters |
+| `API_KEY_PROD` | yes | — | API key clients send as `Authorization: Bearer <key>`; the server refuses to start without it (24+ characters in production) |
+| `API_KEY_NEW` | no | — | Second accepted key while rotating |
+| `CENTROIDS_PATH` | no | `data/centroids.npz` | Domain centroid archive (no pickle) |
 | `MODEL_NAME` | no | `kinnow-v1` | Model name sent to vLLM |
 | `ENV` | no | — | `development` / `staging` / `production` |
 | `LOG_LEVEL` | no | — | Log verbosity |
