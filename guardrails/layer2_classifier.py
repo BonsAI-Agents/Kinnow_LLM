@@ -46,6 +46,7 @@ STRONG_OOS_PATTERNS = [
     r'\bwho (won|wins)\b.{0,40}\b(ipl|match|cup|final|series|game|league|election|race|medal)\b',
     # Personal investing (not "stock" or "shares", which are ERP/MCA words)
     r'\b(mutual funds?|crypto\w*|bitcoin|nifty|sensex|intraday|stock tips|direct stocks)\b',
+    r'\b(how (do|should|can) (i|we) invest|where (to|should i) invest|best returns?)\b',
     # Trip planning ("business trip" and "tour operator" GST questions are valid)
     r'\b(itinerary|plan a \d+[- ]day)\b',
     # Personal/relationship
@@ -222,6 +223,25 @@ def classify_input_fast(query: str) -> tuple[str, float]:
     return 'uncertain', 0.5
 
 
+# Which domain an in-scope query is about (reported to clients as category_detected and logged).
+# Informational only: it never changes whether a query is answered.
+_CATEGORY_KEYWORDS = {
+    'INVOICE': r'\b(invoices?|credit notes?|debit notes?|gstr-?2[ab]|reconcil\w*|vendors?|purchase orders?|three-way|irn)\b',
+    'GST': r'\b(gst|igst|cgst|sgst|utgst|hsn|sac|itc|gstr\S*|e-way|eway|composition|reverse charge|lut|rcm|e-invoic\w*)\b',
+    'PAYROLL': r'\b(payroll|salary|salaries|pf|epf|eps|esi|esic|form 16|gratuity|bonus|ctc|hra|lta|wages|leave encashment)\b',
+    'ERP': r'\b(erp|ledgers?|journal|trial balance|depreciation|mca|companies act|aoc-4|mgt-7|advance tax|agm|tds|tcs|professional tax)\b',
+}
+_CATEGORY_PRIORITY = ['INVOICE', 'PAYROLL', 'GST', 'ERP']      # tie-break order
+
+
+def detect_category(query: str) -> str | None:
+    """Best-guess domain from keywords, or None when nothing matches."""
+    q = query.lower()
+    counts = {name: len(re.findall(pattern, q, re.IGNORECASE)) for name, pattern in _CATEGORY_KEYWORDS.items()}
+    best = max(_CATEGORY_PRIORITY, key=lambda name: (counts[name], -_CATEGORY_PRIORITY.index(name)))
+    return best if counts[best] else None
+
+
 def classify_by_embedding(query: str) -> tuple[str, float]:
     """
     Embedding-based classification against domain centroids.
@@ -260,12 +280,14 @@ def classify_query(query: str) -> dict:
 
     # Fast pass: strong ERP keyword signal (2+ matches)
     if fast_decision == 'in_scope' and fast_conf >= 0.9:
-        return {'decision': 'pass', 'reason': 'keyword_in_scope', 'confidence': fast_conf}
+        return {'decision': 'pass', 'reason': 'keyword_in_scope', 'confidence': fast_conf,
+                'category': detect_category(query)}
 
     # When no centroids are loaded, promote keyword-only decision directly
     if not _domain_centroids:
         if fast_decision == 'in_scope':
-            return {'decision': 'pass', 'reason': 'keyword_in_scope_no_centroids', 'confidence': fast_conf}
+            return {'decision': 'pass', 'reason': 'keyword_in_scope_no_centroids', 'confidence': fast_conf,
+                    'category': detect_category(query)}
         if fast_decision == 'out_of_scope':
             return {'decision': 'block', 'reason': 'keyword_oos', 'confidence': fast_conf}
         return {
@@ -276,7 +298,7 @@ def classify_query(query: str) -> dict:
         }
 
     # Uncertain — use embedding similarity
-    _, emb_conf = classify_by_embedding(query)
+    emb_category, emb_conf = classify_by_embedding(query)
 
     if fast_decision == 'in_scope':
         pass_at, clarify_at = CLASSIFIER_THRESHOLD_PASS_KEYWORD, CLASSIFIER_THRESHOLD_CLARIFY_KEYWORD
@@ -287,7 +309,8 @@ def classify_query(query: str) -> dict:
         clarify_at -= HINDI_THRESHOLD_OFFSET
 
     if emb_conf >= pass_at:
-        return {'decision': 'pass', 'reason': 'embedding_high_confidence', 'confidence': emb_conf}
+        return {'decision': 'pass', 'reason': 'embedding_high_confidence', 'confidence': emb_conf,
+                'category': emb_category if emb_category in _CATEGORY_KEYWORDS else detect_category(query)}
 
     if emb_conf >= clarify_at:
         return {

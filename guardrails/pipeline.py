@@ -7,6 +7,8 @@ Execution order:
 Refusal anomaly tracker (Section 21f): rate-limits users who repeatedly probe OOS topics.
 """
 
+import hashlib
+
 from .layer4_injection import sanitize_input, detect_injection
 from .layer2_classifier import classify_query
 from .layer1_system_prompt import build_messages, sanitize_history
@@ -21,6 +23,26 @@ _default_limiter = InMemoryRateLimiter()
 def reset_oos_tracker() -> None:
     """Clear the default limiter's state. Call in test setup to avoid inter-test pollution."""
     _default_limiter.reset()
+
+
+# The guardrail that acted, using the plan's names (sections 7d and 21e), and the layer it belongs to
+# (used for metrics). Keyed by the internal block reason.
+GUARDRAIL_BY_REASON = {
+    'injection': ('injection_defense', 'layer4'),
+    'oos_query': ('input_classifier', 'layer2'),
+    'clarification_requested': ('input_classifier', 'layer2'),
+    'rate_limited': ('rate_limiter', 'layer2'),
+    'oos_output': ('output_validator', 'layer3'),
+    'pii_in_output': ('output_validator', 'layer3'),
+    'output_length': ('output_validator', 'layer3'),
+    'model_error': ('model_error', 'model'),
+    'circuit_open': ('circuit_breaker', 'circuit_breaker'),
+}
+
+
+def anonymise(user_id: str) -> str:
+    """Non-reversible id for logs: raw user ids are never logged (plan section 13a)."""
+    return hashlib.sha256(user_id.encode()).hexdigest()[:16]
 
 
 REFUSAL_RESPONSE = (
@@ -57,7 +79,11 @@ class KinnowGuardrailPipeline:
         {
             'response': str,
             'blocked': bool,
-            'block_reason': str | None,
+            'block_reason': str | None,          # internal reason, e.g. 'oos_query'
+            'guardrail_triggered': str | None,   # plan name, e.g. 'input_classifier'
+            'guardrail_layer': str | None,       # 'layer2' ... 'model'
+            'category_detected': str | None,     # GST / PAYROLL / INVOICE / ERP for answered queries
+            'flags': list[str],                  # e.g. ['gst_rate_caveat']
             'messages_sent': list[dict] | None   # only when model was called
         }
         """
@@ -85,6 +111,8 @@ class KinnowGuardrailPipeline:
             self._log_security('oos_blocked', user_id, classification.get('reason', ''))
             return self._blocked_response(REFUSAL_RESPONSE, 'oos_query')
 
+        category = classification.get('category')
+
         # --- Layer 1: Build messages with sanitized history + system prompt ---
         clean_history = sanitize_history(history)
         messages = build_messages(query, clean_history)
@@ -97,14 +125,14 @@ class KinnowGuardrailPipeline:
                 # Model known to be down: let the API answer 503 (plan section 23) instead of
                 # presenting a generic "rephrase your question" reply.
                 raise
-            self._log_event('model_error', {'user_id': user_id, 'error': str(e)})
+            self._log_event('model_error', {'user_hash': anonymise(user_id), 'error': str(e)})
             return self._blocked_response(OUTPUT_INVALID_RESPONSE, 'model_error')
 
         # --- Layer 3: Output validation ---
         validation = validate_output_v2(raw_output)
         if not validation['valid']:
             self._log_event('output_invalid', {
-                'user_id': user_id,
+                'user_hash': anonymise(user_id),
                 'issues': validation['issues'],
             })
             if any('oos_response' in issue for issue in validation['issues']):
@@ -118,33 +146,48 @@ class KinnowGuardrailPipeline:
                 # Return response but append a caveat
                 caveat = ("\n\n*Note: Please verify GST rates with the official GSTN portal "
                           "or a Chartered Accountant before filing.*")
-                return self._success_response(raw_output + caveat, messages)
+                return self._success_response(raw_output + caveat, messages, category, flags=['gst_rate_caveat'])
 
-        return self._success_response(raw_output, messages)
+        return self._success_response(raw_output, messages, category)
 
     # --- Response builders ---
 
     def _blocked_response(self, message: str, reason: str) -> dict:
+        guardrail, layer = GUARDRAIL_BY_REASON.get(reason, ('unknown', 'unknown'))
         return {
             'response': message,
             'blocked': True,
             'block_reason': reason,
+            'guardrail_triggered': guardrail,
+            'guardrail_layer': layer,
+            'category_detected': None,
+            'flags': [],
             'messages_sent': None,
         }
 
     def _clarification_response(self, message: str) -> dict:
+        guardrail, layer = GUARDRAIL_BY_REASON['clarification_requested']
         return {
             'response': message,
             'blocked': False,
             'block_reason': 'clarification_requested',
+            'guardrail_triggered': guardrail,
+            'guardrail_layer': layer,
+            'category_detected': None,
+            'flags': ['clarification'],
             'messages_sent': None,
         }
 
-    def _success_response(self, text: str, messages: list[dict]) -> dict:
+    def _success_response(self, text: str, messages: list[dict], category: str | None = None,
+                          flags: list[str] | None = None) -> dict:
         return {
             'response': text,
             'blocked': False,
             'block_reason': None,
+            'guardrail_triggered': None,
+            'guardrail_layer': None,
+            'category_detected': category,
+            'flags': flags or [],
             'messages_sent': messages,
         }
 
@@ -161,6 +204,6 @@ class KinnowGuardrailPipeline:
         print(json.dumps({
             'level': 'SECURITY',
             'event': event_type,
-            'user_id': user_id,
+            'user_hash': anonymise(user_id),
             'detail': detail,
         }), file=sys.stderr)
