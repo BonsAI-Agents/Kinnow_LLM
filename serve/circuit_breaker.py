@@ -20,10 +20,18 @@ COOLDOWN_SECONDS = 60       # time in OPEN before trying HALF-OPEN
 SUCCESS_THRESHOLD = 1       # successes in HALF-OPEN before CLOSED
 
 
+def _reject(coro, message: str):
+    """Refuse a call: close the never-awaited coroutine so it is not leaked, then raise."""
+    close = getattr(coro, 'close', None)
+    if close:
+        close()
+    raise RuntimeError(message)
+
+
 class CircuitBreaker:
     def __init__(self):
         self.state = State.CLOSED
-        self._failures = 0
+        self._failures = 0                # consecutive failures
         self._opened_at: float = 0.0
         self._lock = asyncio.Lock()
         self._testing_half_open = False   # gates to exactly one test call in HALF_OPEN
@@ -39,21 +47,20 @@ class CircuitBreaker:
                     self.state = State.HALF_OPEN
                     self._testing_half_open = False
                 else:
-                    raise RuntimeError(
-                        f"circuit_open: model unavailable, retry in "
-                        f"{int(COOLDOWN_SECONDS - elapsed)}s"
-                    )
+                    _reject(coro, f"circuit_open: model unavailable, retry in "
+                                  f"{int(COOLDOWN_SECONDS - elapsed)}s")
             if self.state == State.HALF_OPEN:
                 if self._testing_half_open:
-                    raise RuntimeError("circuit_open: probe already in-flight, retry shortly")
+                    _reject(coro, "circuit_open: probe already in-flight, retry shortly")
                 self._testing_half_open = True
 
         try:
             result = await coro
             async with self._lock:
+                # Any success ends the failure streak: only consecutive failures trip the breaker.
+                self._failures = 0
                 if self.state == State.HALF_OPEN:
                     self.state = State.CLOSED
-                    self._failures = 0
                     self._testing_half_open = False
             return result
         except Exception as exc:

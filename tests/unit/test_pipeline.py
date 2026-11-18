@@ -127,3 +127,22 @@ class TestPipelineModelError:
         result = await pipeline.process("What is the GST rate on GSTR-3B?", history=[])
         assert result['blocked'] is True
         assert result['block_reason'] == 'model_error'
+
+
+class TestPipelineModelFailures:
+    async def test_open_circuit_propagates_so_the_api_can_answer_503(self):
+        async def circuit_open(messages):
+            raise RuntimeError("circuit_open: model unavailable, retry in 30s")
+
+        pipeline = KinnowGuardrailPipeline(model_fn=circuit_open)
+        with pytest.raises(RuntimeError, match="circuit_open"):
+            await pipeline.process("Explain GST filing in GSTR-3B for my invoice", history=[])
+
+    async def test_other_model_errors_stay_graceful(self):
+        async def broken(messages):
+            raise ConnectionError("vllm unreachable")
+
+        pipeline = KinnowGuardrailPipeline(model_fn=broken)
+        result = await pipeline.process("Explain GST filing in GSTR-3B for my invoice", history=[])
+        assert result['blocked'] is True
+        assert result['block_reason'] == 'model_error'

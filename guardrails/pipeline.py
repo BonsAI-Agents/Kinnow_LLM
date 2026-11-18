@@ -98,6 +98,10 @@ class KinnowGuardrailPipeline:
         try:
             raw_output = await self.model_fn(messages)
         except Exception as e:
+            if 'circuit_open' in str(e):
+                # Model known to be down: let the API answer 503 (plan section 23) instead of
+                # presenting a generic "rephrase your question" reply.
+                raise
             self._log_event('model_error', {'user_id': user_id, 'error': str(e)})
             return self._blocked_response(OUTPUT_INVALID_RESPONSE, 'model_error')
 
