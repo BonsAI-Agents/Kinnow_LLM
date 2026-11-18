@@ -63,7 +63,7 @@ _HOMOGLYPHS = str.maketrans({
     'с': 'c', 'у': 'y', 'х': 'x',
     'α': 'a', 'ο': 'o', 'ν': 'v', 'ρ': 'p', 'ε': 'e', 'τ': 't',
 })
-_INVISIBLE = re.compile('[​-‏⁠﻿­]')
+_INVISIBLE = re.compile(r'[\u200b-\u200f\u2060\ufeff\u00ad]')
 _SPELLED_OUT = re.compile(r'(?<=\b\w)-(?=\w\b)')   # "i-g-n-o-r-e" -> "ignore"
 
 
