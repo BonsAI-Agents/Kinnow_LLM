@@ -5,7 +5,7 @@ Startup sequence:
   1. Connect Redis
   2. Connect vLLM client
   3. Load embedding model (lazy — first request triggers load)
-  4. Load domain centroids from data/centroids.npy
+  4. Load domain centroids from data/centroids.npz and warm the embedding model
   5. Initialize guardrail pipeline
   6. Register routes
 
@@ -13,11 +13,11 @@ Run locally:
     uvicorn serve.app:app --host 0.0.0.0 --port 8000 --workers 1
 """
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import numpy as np
 from fastapi import FastAPI
 from prometheus_client import make_asgi_app
 
@@ -31,10 +31,10 @@ from serve.routes.health import router as health_router
 from serve.routes.feedback import router as feedback_router
 from serve.circuit_breaker import get_circuit_breaker
 from guardrails.pipeline import KinnowGuardrailPipeline
-from guardrails.layer2_classifier import set_domain_centroids
+from guardrails.layer2_classifier import set_domain_centroids, load_centroids, load_embedding_model
 
 
-CENTROIDS_PATH = os.getenv('CENTROIDS_PATH', 'data/centroids.npy')
+CENTROIDS_PATH = os.getenv('CENTROIDS_PATH', 'data/centroids.npz')
 
 
 @asynccontextmanager
@@ -53,9 +53,14 @@ async def lifespan(app: FastAPI):
     # Load domain centroids if available
     centroids_file = Path(CENTROIDS_PATH)
     if centroids_file.exists():
-        centroids = np.load(str(centroids_file), allow_pickle=True).item()
+        centroids = load_centroids(centroids_file)
         set_domain_centroids(centroids)
         print(f"  ✓ Centroids loaded ({len(centroids)} domains)")
+        # Load the embedding model now, not on the first request that reaches it (several seconds of
+        # latency, and a failed load would surface as user-facing errors). A failure here stops the
+        # server from becoming ready instead.
+        await asyncio.to_thread(load_embedding_model)
+        print("  ✓ Embedding model loaded")
     else:
         print(f"  ⚠ Centroids not found at {CENTROIDS_PATH} — classifier runs keyword-only mode")
 

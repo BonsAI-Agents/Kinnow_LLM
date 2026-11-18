@@ -407,9 +407,10 @@ class TestLifespan:
         monkeypatch.setattr(appmod, "init_vllm_client", init_vllm)
         monkeypatch.setattr(appmod, "close_redis", close_redis)
         monkeypatch.setattr(appmod, "close_vllm_client", close_vllm)
-        path = tmp_path / "centroids.npy"
+        path = tmp_path / "centroids.npz"
         if centroids is not None:
-            np.save(str(path), centroids)
+            layer2_classifier.save_centroids(centroids, path)
+            monkeypatch.setattr(appmod, "load_embedding_model", lambda: events.append("warm_model"))
         monkeypatch.setattr(appmod, "CENTROIDS_PATH", str(path))
         return events
 
@@ -427,10 +428,37 @@ class TestLifespan:
         assert "keyword-only" in capsys.readouterr().out
 
     def test_loads_centroids_when_the_file_exists(self, monkeypatch, tmp_path, capsys):
-        self.run_app(monkeypatch, tmp_path, centroids={"GST": np.ones(4), "PAYROLL": np.ones(4)})
+        events = self.run_app(monkeypatch, tmp_path, centroids={"GST": np.ones(4), "PAYROLL": np.ones(4)})
         with TestClient(appmod.app):
             assert set(layer2_classifier._domain_centroids) == {"GST", "PAYROLL"}
+            assert "warm_model" in events            # the embedding model is loaded at startup, not on the first request
         assert "Centroids loaded (2 domains)" in capsys.readouterr().out
+
+    def test_does_not_load_the_embedding_model_in_keyword_only_mode(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(appmod, "load_embedding_model", lambda: pytest.fail("model must not be loaded"))
+        self.run_app(monkeypatch, tmp_path)
+        with TestClient(appmod.app):
+            pass
+
+    def test_a_failed_model_load_stops_the_server_from_starting(self, monkeypatch, tmp_path):
+        self.run_app(monkeypatch, tmp_path, centroids={"GST": np.ones(4)})
+
+        def cannot_load():
+            raise OSError("model files unavailable")
+
+        monkeypatch.setattr(appmod, "load_embedding_model", cannot_load)
+        with pytest.raises(OSError, match="unavailable"):
+            with TestClient(appmod.app):
+                pass
+
+    def test_a_legacy_pickled_centroid_file_is_refused_at_startup(self, monkeypatch, tmp_path):
+        self.run_app(monkeypatch, tmp_path)
+        legacy = tmp_path / "centroids.npy"
+        np.save(str(legacy), {"GST": np.ones(3)}, allow_pickle=True)
+        monkeypatch.setattr(appmod, "CENTROIDS_PATH", str(legacy))
+        with pytest.raises(ValueError, match="pickled"):
+            with TestClient(appmod.app):
+                pass
 
     def test_pipeline_calls_vllm_through_the_circuit_breaker(self, monkeypatch, tmp_path, fake_redis):
         self.run_app(monkeypatch, tmp_path)

@@ -28,13 +28,12 @@ from guardrails.layer2_classifier import classify_query  # noqa: E402
 
 
 def load_centroids() -> str:
-    """Load data/centroids.npy exactly like serve/app.py does. Returns the mode label."""
+    """Load data/centroids.npz exactly like serve/app.py does. Returns the mode label."""
     import os
-    import numpy as np
-    from guardrails.layer2_classifier import set_domain_centroids
-    path = Path(os.getenv("CENTROIDS_PATH", str(ROOT / "data" / "centroids.npy")))
+    from guardrails.layer2_classifier import set_domain_centroids, load_centroids
+    path = Path(os.getenv("CENTROIDS_PATH", str(ROOT / "data" / "centroids.npz")))
     if path.exists():
-        centroids = np.load(str(path), allow_pickle=True).item()
+        centroids = load_centroids(path)
         set_domain_centroids(centroids)
         return f"embedding + keyword ({len(centroids)} domain centroids)"
     return "KEYWORD-ONLY (no centroids; run scripts/build_centroids.py, the server uses centroids)"

@@ -5,6 +5,8 @@ Three-step pipeline: keyword → embedding → decision.
 """
 
 import re
+from pathlib import Path
+
 import numpy as np
 
 # --- Keyword patterns ---
@@ -166,6 +168,28 @@ def build_centroids(training_examples: dict) -> dict:
         embeddings = model.encode(examples, show_progress_bar=False)
         centroids[category] = embeddings.mean(axis=0)
     return centroids
+
+
+def save_centroids(centroids: dict[str, np.ndarray], path) -> None:
+    """Write centroids as a plain .npz archive (one array per domain): no pickle involved."""
+    np.savez(str(path), **centroids)
+
+
+def load_centroids(path) -> dict[str, np.ndarray]:
+    """
+    Read a centroid archive written by save_centroids().
+
+    Loaded with allow_pickle=False: a pickled .npy file can execute arbitrary code when loaded,
+    and this file is mounted from a ConfigMap, so it is treated as untrusted input.
+    """
+    p = Path(path)
+    if p.suffix == '.npy':
+        raise ValueError(
+            f"{p} is a pickled .npy centroid file, which is no longer loaded because unpickling "
+            f"can run code. Rebuild it with scripts/build_centroids.py (writes a .npz)."
+        )
+    with np.load(str(p), allow_pickle=False) as data:
+        return {name: data[name] for name in data.files}
 
 
 def set_domain_centroids(centroids: dict[str, np.ndarray]) -> None:

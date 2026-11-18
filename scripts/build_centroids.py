@@ -1,22 +1,25 @@
 """
 Build embedding centroids for the Layer 2 classifier from training data.
 Run this once after the training data is ready, before starting the API server.
-Centroids are saved to data/centroids.npy and loaded at server startup.
+Centroids are saved to data/centroids.npz and loaded at server startup.
 
 Usage:
     python scripts/build_centroids.py data/v1_training/train.jsonl
 Output:
-    data/centroids.npy   — numpy file with {domain: centroid_vector}
+    data/centroids.npz   — numpy file with {domain: centroid_vector}
 """
 
 import json
 import argparse
-import numpy as np
+import sys
 from collections import defaultdict
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from guardrails.layer2_classifier import save_centroids  # noqa: E402
 
-def build_and_save(train_path: str, output_path: str = 'data/centroids.npy'):
+
+def build_and_save(train_path: str, output_path: str = 'data/centroids.npz'):
     try:
         from sentence_transformers import SentenceTransformer
     except ImportError:
@@ -51,17 +54,17 @@ def build_and_save(train_path: str, output_path: str = 'data/centroids.npy'):
 
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    np.save(str(out), centroids)
+    save_centroids(centroids, out)
     print(f"\nCentroids saved to {out}")
     print("Load at server startup with:")
-    print("  from guardrails.layer2_classifier import set_domain_centroids")
-    print("  centroids = np.load('data/centroids.npy', allow_pickle=True).item()")
+    print("  from guardrails.layer2_classifier import set_domain_centroids, load_centroids")
+    print("  centroids = load_centroids('data/centroids.npz')")
     print("  set_domain_centroids(centroids)")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('train_path', help='Path to train.jsonl')
-    parser.add_argument('--output', default='data/centroids.npy')
+    parser.add_argument('--output', default='data/centroids.npz')
     args = parser.parse_args()
     build_and_save(args.train_path, args.output)

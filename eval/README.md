@@ -16,7 +16,7 @@ Held-out evaluation data for the v1 exit criteria in `kinnow-production-plan-v1.
 python eval/run_full_eval.py --self-test                       # checks the sets against their own references
 python eval/run_full_eval.py --model-id Qwen/Qwen2.5-7B-Instruct --tag baseline   # measure the base model first
 python eval/run_full_eval.py --model-id <trained model> --tag v1
-python eval/test_domain_lock.py                                # needs data/centroids.npy for production behaviour
+python eval/test_domain_lock.py                                # needs data/centroids.npz for production behaviour
 ```
 
 `run_full_eval.py` calls the model with the production system prompt, checks the plan's targets (overall 78%, GST 65%, Payroll 82%, Invoice 86%, false refusals under 3%, Hindi gap), and applies the 5pp regression gate against the previous run. It exits 1 on any failure.
