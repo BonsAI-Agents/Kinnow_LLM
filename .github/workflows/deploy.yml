@@ -10,7 +10,37 @@ on:
       - "requirements.txt"
 
 jobs:
+  wait-for-ci:
+    # Never deploy a commit that has not passed CI. This workflow starts on push, in parallel with
+    # CI, so it waits for the CI run on this exact commit and stops if that run fails.
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Wait for CI to pass on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          for attempt in $(seq 1 60); do
+            result=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --commit "$SHA" --event push \
+              --json status,conclusion \
+              --jq '.[0] | if . == null then "missing" elif .status == "completed" then .conclusion else "pending" end')
+            echo "attempt $attempt: CI is $result"
+            case "$result" in
+              success) exit 0 ;;
+              failure|cancelled|timed_out|action_required|startup_failure|stale)
+                echo "CI did not pass for $SHA: not deploying." >&2
+                exit 1 ;;
+            esac
+            sleep 30
+          done
+          echo "Timed out waiting for CI on $SHA: not deploying." >&2
+          exit 1
+
   build-and-push:
+    needs: wait-for-ci
     runs-on: ubuntu-latest
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
@@ -70,13 +100,7 @@ jobs:
         env:
           PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
 
-  promote-production:
-    needs: deploy-canary
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Scale to 100% traffic
-        run: |
-          kubectl scale deployment/kinnow-api --replicas=2 -n kinnow
-          kubectl rollout status deployment/kinnow-api -n kinnow --timeout=120s
-          echo "Deployment complete."
+  # Promotion to production is deliberately NOT automatic. After the canary has run and the SLO
+  # check above has passed, a person runs the "Promote to production" workflow by hand
+  # (.github/workflows/promote-production.yml). GitHub's required-reviewers protection is not
+  # available for private repositories on this plan, so the manual trigger is the approval gate.

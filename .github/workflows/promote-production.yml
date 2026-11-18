@@ -1,0 +1,31 @@
+name: Promote to production
+
+# Manual approval gate. The Deploy workflow stops after the canary; a person runs this workflow
+# once the canary looks healthy (SLO check passed, dashboards quiet) to scale to 100% traffic.
+#
+# Only people with write access to the repository can run it, and the run is recorded with their
+# name. If this repository moves to a GitHub plan with environment protection rules, add required
+# reviewers to the "production" environment as well.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "promote" to scale the canary to 100% of traffic'
+        required: true
+        type: string
+
+jobs:
+  promote:
+    if: ${{ inputs.confirm == 'promote' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Scale to 100% traffic
+        run: |
+          kubectl scale deployment/kinnow-api --replicas=2 -n kinnow
+          kubectl rollout status deployment/kinnow-api -n kinnow --timeout=120s
+          echo "Promoted by ${{ github.actor }} from ${{ github.sha }}."
