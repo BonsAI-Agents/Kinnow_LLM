@@ -1,8 +1,9 @@
 # AWQ quantisation (training/quantize_awq.py). Standalone, GPU machine.
 #
 # autoawq 0.2.6 requires torch==2.3.1, which conflicts with the training stack's torch,
-# so it gets its own environment: merge the adapter first (requirements-train.txt),
+# so it gets its own environment: merge the adapter first (training/requirements-train.txt),
 # then quantise the merged model here.
+# Kept in training/ so Dependabot (which scans the repo root only) does not bump autoawq's pins.
 
 autoawq==0.2.6
 transformers==4.46.1

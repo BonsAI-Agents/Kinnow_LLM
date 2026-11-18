@@ -1,7 +1,7 @@
 # Production API runtime (installed in the Docker image and in CI).
 #
 # The vLLM model server runs in its own container (the API reaches it over HTTP via
-# VLLM_BASE_URL), and the training / quantisation stack lives in requirements-train.txt,
+# VLLM_BASE_URL), and the training / quantisation stacks live in training/requirements-*.txt,
 # so neither belongs here. Keeping them out removes the vllm/torch pin conflict that made
 # this file uninstallable and the ~20 CVEs that came with vllm and the old transformers.
 #

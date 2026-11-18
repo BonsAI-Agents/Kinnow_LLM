@@ -93,8 +93,8 @@ queries in 5 minutes is rate limited for 10 minutes and raises a security event.
 # 1. Dependencies
 python -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements-dev.txt   # API + tests. Training (Kaggle): requirements-train.txt,
-                                      # AWQ quantisation: requirements-quantize.txt (each standalone)
+pip install -r requirements-dev.txt   # API + tests. Training (Kaggle): training/requirements-train.txt,
+                                      # AWQ quantisation: training/requirements-quantize.txt (each standalone)
 
 # 2. Configuration
 cp .env.example .env              # fill in HF_TOKEN and the local URLs

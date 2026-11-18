@@ -6,7 +6,9 @@
 # Not shipped in the Docker image and not scanned by CI's Trivy step (it only reads
 # requirements.txt), so these older pins carry known CVEs: use on ephemeral machines only
 # and do not upgrade without re-running the training scripts.
-# AWQ quantisation needs a different torch and lives in requirements-quantize.txt.
+# AWQ quantisation needs a different torch and lives in training/requirements-quantize.txt.
+# Kept in training/ (not the repo root) on purpose: Dependabot scans the root only, and an
+# automatic 'bump transformers to 5.x' PR would break the training scripts these pins match.
 
 torch==2.4.1
 transformers==4.46.1
