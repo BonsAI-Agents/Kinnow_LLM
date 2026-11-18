@@ -22,7 +22,7 @@ jobs:
     environment: production
     steps:
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
 
       - name: Scale to 100% traffic
         run: |
