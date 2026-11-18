@@ -6,5 +6,5 @@
 # Kept in training/ so Dependabot (which scans the repo root only) does not bump autoawq's pins.
 
 autoawq==0.2.6
-transformers==4.46.1
+transformers==5.23.0
 numpy==1.26.4
