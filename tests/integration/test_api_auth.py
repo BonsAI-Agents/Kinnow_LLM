@@ -1,5 +1,5 @@
 """
-Authentication and session isolation through the running app (serve/auth.py wired into the routes).
+Authentication and per-key isolation through the running app (serve/auth.py wired into the routes).
 """
 
 import httpx
@@ -18,6 +18,7 @@ GOOD_REPLY = (
     "Input tax credit is not available on this. File GSTR-3B by 20th of next month."
 )
 IN_SCOPE = "Explain GST filing in GSTR-3B for my invoice"
+OOS = "What is the weather in Mumbai today?"
 SECOND_KEY = "second-client-key"
 
 
@@ -40,7 +41,7 @@ def app_client(monkeypatch, fake_redis, tmp_path, seen_messages):
     monkeypatch.setenv("API_KEY_NEW", SECOND_KEY)
     for name in ("init_redis", "close_redis", "init_vllm_client", "close_vllm_client"):
         monkeypatch.setattr(appmod, name, _noop)
-    monkeypatch.setattr(appmod, "CENTROIDS_PATH", str(tmp_path / "missing.npy"))
+    monkeypatch.setattr(appmod, "CENTROIDS_PATH", str(tmp_path / "missing.npz"))
 
     async def model_fn(messages):
         seen_messages.append(messages)
@@ -52,8 +53,8 @@ def app_client(monkeypatch, fake_redis, tmp_path, seen_messages):
 
 
 PROTECTED = [
-    ("/v1/chat", {"message": IN_SCOPE}),
-    ("/v1/feedback", {"session_id": "s", "query": "q", "response": "r", "rating": "up"}),
+    ("/v1/chat", {"user_id": "u1", "session_id": "s1", "message": IN_SCOPE}),
+    ("/v1/feedback", {"user_id": "u1", "session_id": "s1", "request_id": "r1", "rating": 5}),
 ]
 
 
@@ -71,19 +72,21 @@ class TestAuthentication:
     @pytest.mark.parametrize("path,body", PROTECTED)
     def test_both_the_primary_and_the_rotation_key_are_accepted(self, app_client, path, body):
         for key in (TEST_API_KEY, SECOND_KEY):
-            assert app_client.post(path, json=body, headers=bearer(key)).status_code == 200
+            assert app_client.post(path, json=body, headers=bearer(key)).status_code in (200, 204)
 
     def test_rejected_chat_request_never_touches_redis_or_the_model(self, app_client, fake_redis, seen_messages):
-        app_client.post("/v1/chat", json={"message": IN_SCOPE})
+        app_client.post("/v1/chat", json=PROTECTED[0][1])
         assert fake_redis.store == {} and seen_messages == []
 
-    def test_probes_and_metrics_stay_open(self, app_client, monkeypatch):
+    def test_probes_stay_open(self, app_client, monkeypatch):
         monkeypatch.setattr(
             vllm_client, "_client",
             httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200)), base_url="http://vllm.test"),
         )
         assert app_client.get("/health").status_code == 200
         assert app_client.get("/ready").status_code == 200
+
+    def test_metrics_need_no_api_key_for_prometheus_inside_the_cluster(self, app_client):
         assert app_client.get("/metrics/").status_code == 200
 
     def test_the_app_refuses_to_start_without_an_api_key(self, monkeypatch, fake_redis):
@@ -98,8 +101,9 @@ class TestAuthentication:
 class TestSessionIsolation:
     SESSION = "shared-session-id"
 
-    def send(self, client, key, message):
-        return client.post("/v1/chat", json={"session_id": self.SESSION, "message": message}, headers=bearer(key))
+    def send(self, client, key, message, user_id="u1"):
+        return client.post("/v1/chat", json={"user_id": user_id, "session_id": self.SESSION, "message": message},
+                           headers=bearer(key))
 
     def test_one_key_cannot_read_anothers_history_by_guessing_the_session_id(self, app_client, seen_messages):
         self.send(app_client, TEST_API_KEY, "Explain GST filing in GSTR-3B for my confidential invoice 4471")
@@ -119,39 +123,49 @@ class TestSessionIsolation:
         assert f"session:{owner_id(SECOND_KEY)}:{self.SESSION}" in fake_redis.store
         assert f"session:{self.SESSION}" not in fake_redis.store
 
-    def test_rate_limit_state_is_separate_per_key(self, app_client):
-        """One key exhausting its off-topic allowance must not rate-limit another key's same session id."""
+    def test_off_topic_limit_state_is_separate_per_key(self, app_client):
+        """One key exhausting its off-topic allowance must not limit another key's same user id."""
         for _ in range(10):
-            self.send(app_client, TEST_API_KEY, "What is the weather in Mumbai today?")
-        limited = self.send(app_client, TEST_API_KEY, "What is the weather in Mumbai today?").json()
-        assert limited["block_reason"] == "rate_limited"
+            self.send(app_client, TEST_API_KEY, OOS)
+        limited = self.send(app_client, TEST_API_KEY, OOS).json()
+        assert limited["guardrail_triggered"] == "rate_limiter"
         other = self.send(app_client, SECOND_KEY, IN_SCOPE).json()
         assert other["blocked"] is False
+
+    def test_request_rate_limit_is_separate_per_key(self, app_client):
+        for _ in range(20):
+            self.send(app_client, TEST_API_KEY, IN_SCOPE)
+        assert self.send(app_client, TEST_API_KEY, IN_SCOPE).status_code == 429
+        assert self.send(app_client, SECOND_KEY, IN_SCOPE).status_code == 200
 
 
 class TestRateLimitIsSharedThroughRedis:
     """The app builds its pipeline with the Redis limiter, so replicas share the off-topic counter."""
 
+    def start(self, monkeypatch, tmp_path):
+        for name in ("init_redis", "close_redis", "init_vllm_client", "close_vllm_client"):
+            monkeypatch.setattr(appmod, name, _noop)
+        monkeypatch.setattr(appmod, "CENTROIDS_PATH", str(tmp_path / "missing.npz"))
+        return TestClient(appmod.app)
+
     def test_the_app_pipeline_uses_the_redis_limiter(self, monkeypatch, fake_redis, tmp_path):
         from serve.rate_limiter import RedisRateLimiter
-        for name in ("init_redis", "close_redis", "init_vllm_client", "close_vllm_client"):
-            monkeypatch.setattr(appmod, name, _noop)
-        monkeypatch.setattr(appmod, "CENTROIDS_PATH", str(tmp_path / "missing.npy"))
-        with TestClient(appmod.app) as c:
+        with self.start(monkeypatch, tmp_path) as c:
             assert isinstance(chat_routes.get_pipeline()._limiter, RedisRateLimiter)
-            c.post("/v1/chat", json={"session_id": "s1", "message": "What is the weather in Mumbai today?"},
-                   headers=bearer(TEST_API_KEY))
-        assert f"rl:oos:count:{owner_id(TEST_API_KEY)}:s1" in fake_redis.store
+            c.post("/v1/chat", json={"user_id": "u1", "session_id": "s1", "message": OOS}, headers=bearer(TEST_API_KEY))
+        assert f"rl:oos:count:{owner_id(TEST_API_KEY)}:u1" in fake_redis.store
 
     def test_ten_off_topic_questions_limit_the_caller_through_redis(self, monkeypatch, fake_redis, tmp_path):
-        for name in ("init_redis", "close_redis", "init_vllm_client", "close_vllm_client"):
-            monkeypatch.setattr(appmod, name, _noop)
-        monkeypatch.setattr(appmod, "CENTROIDS_PATH", str(tmp_path / "missing.npy"))
-        with TestClient(appmod.app) as c:
+        body = {"user_id": "u1", "session_id": "s1", "message": OOS}
+        with self.start(monkeypatch, tmp_path) as c:
             for _ in range(10):
-                c.post("/v1/chat", json={"session_id": "s1", "message": "What is the weather in Mumbai today?"},
-                       headers=bearer(TEST_API_KEY))
-            r = c.post("/v1/chat", json={"session_id": "s1", "message": "What is the weather in Mumbai today?"},
-                       headers=bearer(TEST_API_KEY))
-        assert r.json()["block_reason"] == "rate_limited"
-        assert f"rl:oos:limited:{owner_id(TEST_API_KEY)}:s1" in fake_redis.store
+                c.post("/v1/chat", json=body, headers=bearer(TEST_API_KEY))
+            r = c.post("/v1/chat", json=body, headers=bearer(TEST_API_KEY))
+        assert r.json()["guardrail_triggered"] == "rate_limiter"
+        assert f"rl:oos:limited:{owner_id(TEST_API_KEY)}:u1" in fake_redis.store
+
+    def test_the_request_rate_limit_counts_in_redis_with_expiry(self, monkeypatch, fake_redis, tmp_path):
+        with self.start(monkeypatch, tmp_path) as c:
+            c.post("/v1/chat", json={"user_id": "u1", "session_id": "s1", "message": IN_SCOPE}, headers=bearer(TEST_API_KEY))
+        counters = [k for k in fake_redis.store if k.startswith(f"rl:req:{owner_id(TEST_API_KEY)}:u1:")]
+        assert len(counters) == 2 and all(k in fake_redis.ttls for k in counters)

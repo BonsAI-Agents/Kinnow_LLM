@@ -37,6 +37,12 @@ OOS_RATE = Counter(
     'Out-of-scope queries blocked by classifier',
 )
 
+RATE_LIMITED = Counter(
+    'kinnow_rate_limited_total',
+    'Chat requests rejected by the per-user rate limit',
+    ['scope'],
+)
+
 FEEDBACK_COUNT = Counter(
     'kinnow_feedback_total',
     'User feedback submissions',

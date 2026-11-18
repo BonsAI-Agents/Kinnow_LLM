@@ -4,7 +4,7 @@ Kinnow ERP LLM — FastAPI application entrypoint.
 Startup sequence:
   1. Connect Redis
   2. Connect vLLM client
-  3. Load embedding model (lazy — first request triggers load)
+  3. Set up the per-user request rate limiter
   4. Load domain centroids from data/centroids.npz and warm the embedding model
   5. Initialize guardrail pipeline
   6. Register routes
@@ -24,6 +24,8 @@ from prometheus_client import make_asgi_app
 from serve.auth import load_api_keys
 from serve.redis_client import init_redis, close_redis, get_redis
 from serve.rate_limiter import RedisRateLimiter
+from serve.rate_limit import RequestRateLimiter, set_request_limiter
+from serve.internal_only import InternalOnly
 from serve.vllm_client import init_vllm_client, close_vllm_client, generate
 from serve.middleware import RequestLoggingMiddleware
 from serve.routes.chat import router as chat_router, set_pipeline
@@ -46,6 +48,9 @@ async def lifespan(app: FastAPI):
 
     await init_redis()
     print("  ✓ Redis connected")
+
+    # Per-user request limit (20 a minute, 500 a day by default), counted in Redis
+    set_request_limiter(RequestRateLimiter(get_redis))
 
     await init_vllm_client()
     print("  ✓ vLLM client ready")
@@ -100,5 +105,6 @@ app.include_router(chat_router)
 app.include_router(feedback_router)
 
 # Prometheus metrics endpoint
-metrics_app = make_asgi_app()
+# (internal only: see serve/internal_only.py)
+metrics_app = InternalOnly(make_asgi_app())
 app.mount("/metrics", metrics_app)

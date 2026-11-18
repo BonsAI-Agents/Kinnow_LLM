@@ -27,7 +27,7 @@ RUN PYTHONPATH=/install/lib/python3.11/site-packages python -c \
 FROM python:3.11-slim AS app
 
 # Non-root user for security (Section 20)
-RUN addgroup --system kinnow && adduser --system --ingroup kinnow kinnow
+RUN addgroup --system --gid 1000 kinnow && adduser --system --uid 1000 --ingroup kinnow kinnow
 
 WORKDIR /app
 

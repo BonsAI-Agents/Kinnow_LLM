@@ -61,7 +61,23 @@ async def session_set(session_id: str, history: list[dict], ttl_seconds: int = 3
     await r.setex(_session_key(session_id, owner), ttl_seconds, json.dumps(history))
 
 
-async def feedback_push(user_id: str, query: str, response: str, rating: str):
+async def request_set(owner: str, request_id: str, data: dict, ttl_seconds: int = 3600):
+    """
+    Remember a chat request for one hour so a later thumbs-down can find its text without the
+    client resending it. Same retention as the session history, namespaced by API key so one key
+    cannot rate (or read) another's requests.
+    """
+    r = get_redis()
+    await r.setex(f'request:{owner}:{request_id}', ttl_seconds, json.dumps(data))
+
+
+async def request_get(owner: str, request_id: str) -> dict | None:
+    r = get_redis()
+    raw = await r.get(f'request:{owner}:{request_id}')
+    return json.loads(raw) if raw is not None else None
+
+
+async def feedback_push(user_id: str, query: str, response: str, rating, **extra):
     """Push a thumbs-down feedback event to a Redis list for human review."""
     r = get_redis()
     event = json.dumps({
@@ -69,6 +85,7 @@ async def feedback_push(user_id: str, query: str, response: str, rating: str):
         'query': query,
         'response': response,
         'rating': rating,
+        **extra,
     })
     await r.lpush('feedback:queue', event)
     await r.ltrim('feedback:queue', 0, 9999)  # keep last 10K

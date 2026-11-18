@@ -34,8 +34,18 @@ spec:
     - host: api.kinnow.app
       http:
         paths:
-          - path: /
+          # Only the public API is routed. /metrics, /ready and /docs are deliberately absent, so
+          # the ingress answers 404 for them (plan section 20d: /metrics must not be public).
+          # Prometheus and the kubelet reach those paths on the pod directly.
+          - path: /v1
             pathType: Prefix
+            backend:
+              service:
+                name: kinnow-api
+                port:
+                  number: 80
+          - path: /health
+            pathType: Exact
             backend:
               service:
                 name: kinnow-api
