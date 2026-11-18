@@ -21,26 +21,30 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         ACTIVE_REQUESTS.inc()
         t0 = time.perf_counter()
-
-        response = await call_next(request)
-
-        elapsed = time.perf_counter() - t0
-        ACTIVE_REQUESTS.dec()
-
         endpoint = request.url.path
-        status = str(response.status_code)
 
-        REQUEST_COUNT.labels(endpoint=endpoint, status=status).inc()
+        try:
+            response = await call_next(request)
+        except Exception:
+            # An unhandled error becomes a 500 above this middleware: still count and log it.
+            self._record(request, request_id, endpoint, 500, time.perf_counter() - t0)
+            raise
+        finally:
+            # Always release the gauge, otherwise one exception inflates it forever.
+            ACTIVE_REQUESTS.dec()
+
+        self._record(request, request_id, endpoint, response.status_code, time.perf_counter() - t0)
+        response.headers['X-Request-ID'] = request_id
+        return response
+
+    @staticmethod
+    def _record(request: Request, request_id: str, endpoint: str, status: int, elapsed: float):
+        REQUEST_COUNT.labels(endpoint=endpoint, status=str(status)).inc()
         LATENCY.labels(endpoint=endpoint).observe(elapsed)
-
-        log = {
+        print(json.dumps({
             'request_id': request_id,
             'method': request.method,
             'path': endpoint,
-            'status': response.status_code,
+            'status': status,
             'duration_ms': round(elapsed * 1000, 1),
-        }
-        print(json.dumps(log), file=sys.stdout)
-
-        response.headers['X-Request-ID'] = request_id
-        return response
+        }), file=sys.stdout)

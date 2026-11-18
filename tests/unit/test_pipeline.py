@@ -146,3 +146,24 @@ class TestPipelineModelFailures:
         result = await pipeline.process("Explain GST filing in GSTR-3B for my invoice", history=[])
         assert result['blocked'] is True
         assert result['block_reason'] == 'model_error'
+
+
+class TestPipelineEnforcesOutputLength:
+    QUERY = "Explain GST filing in GSTR-3B for my invoice"
+
+    async def run(self, reply):
+        pipeline = KinnowGuardrailPipeline(model_fn=make_model_fn(reply))
+        return await pipeline.process(self.QUERY, history=[])
+
+    async def test_empty_or_near_empty_output_is_blocked(self):
+        for reply in ("", "OK.", "  "):
+            result = await self.run(reply)
+            assert result['blocked'] is True and result['block_reason'] == 'output_length', repr(reply)
+
+    async def test_runaway_output_is_blocked(self):
+        result = await self.run("GST filing steps for the invoice. " * 200)   # ~7,000 characters
+        assert result['blocked'] is True and result['block_reason'] == 'output_length'
+
+    async def test_normal_output_is_unaffected(self):
+        result = await self.run(GOOD_ERP_RESPONSE)
+        assert result['blocked'] is False and result['response'] == GOOD_ERP_RESPONSE

@@ -201,7 +201,7 @@ class TestChatMetrics:
     def test_layer_mapping_covers_every_block_reason(self):
         mapping = {
             "injection": "layer4", "oos_query": "layer2", "clarification_requested": "layer2",
-            "oos_output": "layer3", "pii_in_output": "layer3", "rate_limited": "layer2",
+            "oos_output": "layer3", "pii_in_output": "layer3", "output_length": "layer3", "rate_limited": "layer2",
             "model_error": "model", "circuit_open": "circuit_breaker", "something_new": "unknown",
         }
         for reason, layer in mapping.items():
@@ -442,3 +442,36 @@ class TestLifespan:
         with TestClient(appmod.app) as c:
             body = chat(c, IN_SCOPE).json()
         assert body["response"] == GOOD_REPLY and body["blocked"] is False
+
+
+class TestMetricsRobustness:
+    def test_in_flight_gauge_is_released_when_a_request_raises(self):
+        """An unhandled exception must not leave kinnow_active_requests permanently inflated."""
+        from fastapi import FastAPI
+        from serve.middleware import RequestLoggingMiddleware
+
+        app = FastAPI()
+        app.add_middleware(RequestLoggingMiddleware)
+
+        @app.get("/boom")
+        async def boom():
+            raise ValueError("boom")
+
+        gauge_before = metric("kinnow_active_requests")
+        labels = {"endpoint": "/boom", "status": "500"}
+        counted_before = metric("kinnow_requests_total", labels)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            assert c.get("/boom").status_code == 500
+        assert metric("kinnow_active_requests") == gauge_before
+        assert metric("kinnow_requests_total", labels) == counted_before + 1
+
+    def test_clarifications_are_visible_in_the_block_metrics(self, client):
+        labels = {"layer": "layer2", "reason": "clarification_requested"}
+        before = metric("kinnow_blocks_total", labels)
+        chat(client, "what is the rate?")
+        assert metric("kinnow_blocks_total", labels) == before + 1
+
+    def test_a_clarification_is_not_counted_as_an_out_of_scope_query(self, client):
+        before = metric("kinnow_oos_queries_total")
+        chat(client, "what is the rate?")
+        assert metric("kinnow_oos_queries_total") == before

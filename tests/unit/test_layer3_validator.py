@@ -133,3 +133,19 @@ class TestGstRateSet:
     def test_interest_and_penalty_percentages_are_not_rates(self):
         assert check_gst_rates("Interest under the GST Act is 24% per annum on wrongly availed ITC.") == []
         assert check_gst_rates("GST देर से जमा करने पर 24% ब्याज लगता है।") == []
+
+
+class TestPiiIsScannedOnce:
+    def test_validate_output_v2_runs_check_pii_a_single_time(self, monkeypatch):
+        from guardrails import layer3_output_validator as l3
+        calls = []
+        real = l3.check_pii
+        monkeypatch.setattr(l3, 'check_pii', lambda text: calls.append(1) or real(text))
+        result = l3.validate_output_v2("GST on software services is 18% under SAC 998314. File GSTR-3B monthly.")
+        assert len(calls) == 1
+        assert result['pii_hits'] == []
+
+    def test_pii_hits_are_still_reported(self):
+        from guardrails.layer3_output_validator import validate_output_v2
+        result = validate_output_v2("The vendor PAN is ABCDE1234F, so file the GST invoice under that PAN.")
+        assert [h['type'] for h in result['pii_hits']] == ['pan_number']

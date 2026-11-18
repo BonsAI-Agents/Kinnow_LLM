@@ -130,7 +130,7 @@ def validate_output(text: str) -> dict:
     if pii_hits:
         issues.append(f'pii_detected:{",".join(h["type"] for h in pii_hits)}')
 
-    return {'valid': len(issues) == 0, 'issues': issues}
+    return {'valid': len(issues) == 0, 'issues': issues, 'pii_hits': pii_hits}
 
 
 def validate_output_v2(text: str) -> dict:
@@ -156,7 +156,7 @@ def validate_output_v2(text: str) -> dict:
     return {
         'valid': len(issues) == 0,
         'issues': issues,
-        'pii_hits': check_pii(text),
+        'pii_hits': basic['pii_hits'],      # computed once in validate_output
         'gst_errors': gst_errors,
         'topic': topic_check,
     }

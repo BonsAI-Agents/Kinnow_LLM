@@ -116,6 +116,9 @@ class KinnowGuardrailPipeline:
                 return self._blocked_response(REFUSAL_RESPONSE, 'oos_output')
             if any('pii_detected' in issue for issue in validation['issues']):
                 return self._blocked_response(OUTPUT_INVALID_RESPONSE, 'pii_in_output')
+            if any(issue in ('output_too_short', 'output_too_long') for issue in validation['issues']):
+                # Empty or runaway generations are model failures, not answers.
+                return self._blocked_response(OUTPUT_INVALID_RESPONSE, 'output_length')
             if any('invalid_gst_rate' in issue for issue in validation['issues']):
                 # Return response but append a caveat
                 caveat = ("\n\n*Note: Please verify GST rates with the official GSTN portal "

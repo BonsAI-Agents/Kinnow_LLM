@@ -65,9 +65,10 @@ async def chat(payload: ChatRequest, request: Request):
             raise HTTPException(status_code=503, detail=err_msg)
         raise HTTPException(status_code=500, detail="internal_error")
 
-    # Record OOS metrics
-    if result['blocked']:
-        reason = result.get('block_reason', 'unknown')
+    # Record block / clarification metrics (a clarification is not "blocked" but is a guardrail
+    # outcome that must be visible too)
+    if result.get('block_reason'):
+        reason = result['block_reason']
         layer = _layer_from_reason(reason)
         BLOCK_COUNT.labels(layer=layer, reason=reason).inc()
         if reason == 'oos_query':
@@ -94,6 +95,7 @@ def _layer_from_reason(reason: str) -> str:
         'clarification_requested': 'layer2',
         'oos_output': 'layer3',
         'pii_in_output': 'layer3',
+        'output_length': 'layer3',
         'rate_limited': 'layer2',
         'model_error': 'model',
         'circuit_open': 'circuit_breaker',
