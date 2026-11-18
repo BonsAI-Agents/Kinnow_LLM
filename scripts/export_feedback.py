@@ -48,6 +48,10 @@ async def export(limit: int, output_path: str):
             export_item = {
                 'query': item.get('query', ''),
                 'bad_response': item.get('response', ''),
+                'rating': item.get('rating'),
+                'label': item.get('label'),
+                'comment': item.get('comment', ''),
+                'text_expired': item.get('text_expired', False),   # query/response were gone after 1h
                 'corrected_completion': '',  # reviewer fills this in
                 'include': None,             # reviewer sets true/false
                 'exported_at': datetime.utcnow().isoformat(),

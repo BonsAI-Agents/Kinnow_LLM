@@ -95,3 +95,6 @@ jobs:
 
       - name: Guardrail eval
         run: python eval/eval_guardrails.py
+
+      - name: Adversarial suite (plan 7d, 100% must be blocked)
+        run: python eval/run_adversarial.py

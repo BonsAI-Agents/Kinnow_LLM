@@ -18,6 +18,8 @@ class KinnowUser(HttpUser):
 
     def on_start(self):
         self.session_id = str(uuid.uuid4())
+        self.user_id = f'load-{uuid.uuid4().hex[:8]}'
+        self.last_request_id = None
         # The endpoints require authentication: pass a key the server accepts (API_KEY_PROD / API_KEY_NEW).
         api_key = os.environ.get('API_KEY', '')
         if not api_key:
@@ -37,22 +39,27 @@ class KinnowUser(HttpUser):
     @task(1)
     def feedback(self):
         """Submit a thumbs-down feedback."""
+        if not self.last_request_id:
+            return
         self.client.post('/v1/feedback', json={
+            'user_id': self.user_id,
             'session_id': self.session_id,
-            'query': random_erp(),
-            'response': 'Some model response.',
-            'rating': 'down',
+            'request_id': self.last_request_id,
+            'rating': 1,
         }, name='/v1/feedback')
 
     def _chat(self, message: str):
         with self.client.post(
             '/v1/chat',
-            json={'session_id': self.session_id, 'message': message},
+            json={'user_id': self.user_id, 'session_id': self.session_id, 'message': message},
             name='/v1/chat',
             catch_response=True,
         ) as resp:
             if resp.status_code == 200:
+                self.last_request_id = resp.json().get('request_id')
                 resp.success()
+            elif resp.status_code == 429:
+                resp.success()  # the per-user limit (20/min) is expected under load
             elif resp.status_code == 503:
                 resp.failure("Circuit breaker open or service unavailable")
             else:
