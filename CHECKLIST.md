@@ -45,7 +45,7 @@ Legend: ✅ Done | 🔄 In Progress | ⬜ Pending | ⏳ Blocked (waiting on exte
 
 | # | Item | Status |
 |---|------|--------|
-| 3.1 | `training/sft_train.py` — QLoRA SFT training script (Qwen2.5-7B, r=64, α=128) | ✅ Script written — now prepends `PRODUCTION_SYSTEM_PROMPT` (plan §4e); longest example 803 tokens vs `max_seq_length=1024`. Not yet run |
+| 3.1 | `training/sft_train.py` — QLoRA SFT training script (Qwen2.5-7B, r=64, α=128) | ✅ Script written — now prepends `PRODUCTION_SYSTEM_PROMPT` (plan §4e); longest example 803 tokens vs `max_seq_length=1024`. Aligned with plan 4d/4f on 2026-11-18: fp16 on a T4 and bf16 on Ampere (auto-detected), loss on the assistant reply only (85% of tokens were prompt), batch 2x4, 600 steps, gradient checkpointing, adamw_8bit, cosine. `--dry-run` checks the data and mask without a GPU. Not yet run |
 | 3.2 | `training/dpo_train.py` — DPO preference alignment script | ✅ Script written — ⚠ learning rate is 5e-5 but the plan says 5e-6; check before running |
 | 3.3 | `training/merge_adapter.py` — merge LoRA adapter into base model | ✅ Script written |
 | 3.4 | `training/quantize_awq.py` — AWQ 4-bit compression (15 GB → 4.5 GB) | ✅ Script written |
@@ -156,7 +156,7 @@ _Last updated 2026-11-18. Code for Phases 1, 4, 5, 6, 7, 8 is complete and cover
 
 **Next, in order**
 1. Expert review of the dataset (2.7), and decide mixed-message behaviour (2.14).
-2. Run the baseline eval (3.6), then the SFT run on Kaggle (3.7), then `eval/run_full_eval.py` on the result (G.2). Use `training/requirements-train.txt`; `sft_train.py` needs an Ampere-or-newer GPU (it sets `bf16=True`).
+2. Run the baseline eval (3.6), then the SFT run on Kaggle (3.7), then `eval/run_full_eval.py` on the result (G.2). Use `training/requirements-train.txt`; `sft_train.py` runs on a T4 (fp16) or an Ampere GPU (bf16); run `python training/sft_train.py --dry-run` first.
 3. Build DPO pairs from the model's failures (2.12), merge, quantise, push (3.8).
 4. Provide cluster details (kubeconfig or EKS cluster name), AWS secrets and the Prometheus URL; then deploy and work through G.3, G.8–G.12.
 
