@@ -7,7 +7,6 @@ from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel, field_validator
 
 from guardrails.pipeline import KinnowGuardrailPipeline
-from serve.circuit_breaker import get_circuit_breaker
 from serve.redis_client import session_get, session_set
 from serve.metrics import OOS_RATE, BLOCK_COUNT
 
@@ -49,7 +48,6 @@ class ChatResponse(BaseModel):
 
 @router.post('/v1/chat', response_model=ChatResponse)
 async def chat(payload: ChatRequest, request: Request):
-    request_id = getattr(request.state, 'request_id', 'anonymous')
     session_id = payload.session_id
 
     # Load conversation history from Redis

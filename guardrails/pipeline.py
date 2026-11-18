@@ -170,11 +170,13 @@ class KinnowGuardrailPipeline:
     # --- Logging ---
 
     def _log_event(self, event_type: str, payload: dict) -> None:
-        import json, sys
+        import json
+        import sys
         print(json.dumps({'event': event_type, **payload}), file=sys.stderr)
 
     def _log_security(self, event_type: str, user_id: str, detail: str) -> None:
-        import json, sys
+        import json
+        import sys
         print(json.dumps({
             'level': 'SECURITY',
             'event': event_type,

@@ -55,10 +55,10 @@ def split_file(input_path: str, val_ratio: float = 0.1, seed: int = 42):
         for ex in val_examples:
             f.write(json.dumps(ex, ensure_ascii=False) + '\n')
 
-    print(f"\nSplit complete:")
+    print("\nSplit complete:")
     print(f"  Train : {len(train_examples)} examples → {train_path}")
     print(f"  Val   : {len(val_examples)} examples → {val_path}")
-    print(f"\n  Domain breakdown (train / val):")
+    print("\n  Domain breakdown (train / val):")
     from collections import Counter
     train_counts = Counter(e['domain'] for e in train_examples)
     val_counts = Counter(e['domain'] for e in val_examples)

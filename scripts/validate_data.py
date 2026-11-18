@@ -108,7 +108,7 @@ def validate_file(path: str) -> bool:
     print(f"  Validation report: {p.name}")
     print(f"{'='*55}")
     print(f"  Total examples : {total}")
-    print(f"  Domain breakdown:")
+    print("  Domain breakdown:")
     for domain in sorted(VALID_DOMAINS):
         count = domain_counts.get(domain, 0)
         bar = '█' * (count // 10)

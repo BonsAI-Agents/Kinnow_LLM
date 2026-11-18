@@ -64,7 +64,7 @@ def prepare(reviewed_path: str, existing_path: str | None, output_path: str):
         for ex in combined:
             f.write(json.dumps(ex, ensure_ascii=False) + '\n')
 
-    print(f"\nV2 data preparation complete:")
+    print("\nV2 data preparation complete:")
     print(f"  Reviewed items  : {len(reviewed)}")
     print(f"  Accepted        : {len(accepted)}")
     print(f"  New (deduplicated): {len(new_examples)}")
