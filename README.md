@@ -127,13 +127,9 @@ python training/dpo_train.py
 python training/merge_adapter.py
 python training/quantize_awq.py
 
-# Serve with vLLM
-python -m vllm.entrypoints.openai.api_server \
-    --model /models/kinnow-v1-awq-4bit \
-    --max-model-len 4096 \
-    --gpu-memory-utilization 0.90 \
-    --served-model-name kinnow-v1 \
-    --port 8001
+# Serve with vLLM (GPU host). Defaults to models/kinnow-v1-awq, the directory quantize_awq.py writes;
+# override with MODEL_PATH, MODEL_NAME, VLLM_PORT. See the header of the script.
+./scripts/start_vllm.sh
 ```
 
 ---

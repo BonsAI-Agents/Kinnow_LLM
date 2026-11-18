@@ -1,6 +1,6 @@
 """
 Async vLLM client — wraps the vLLM OpenAI-compatible HTTP API.
-The vLLM server runs as a separate process (see serve/start_vllm.sh).
+The vLLM server runs as a separate process (see scripts/start_vllm.sh).
 """
 
 import os

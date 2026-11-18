@@ -13,7 +13,11 @@ Usage:
 
 import json
 import argparse
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from guardrails.layer1_system_prompt import PRODUCTION_SYSTEM_PROMPT  # noqa: E402
 
 BASELINE_SCORE = 0.45
 PASS_THRESHOLD = 0.70
@@ -57,7 +61,7 @@ EVAL_CASES = [
     {
         "domain": "GST",
         "prompt": "What is the GST rate on packaged food?",
-        "expected_keywords": ["5%", "12%", "18%"],
+        "expected_keywords": ["5%", "18%"],     # the 12% slab was abolished on 22 Sep 2025
     },
     {
         "domain": "PAYROLL",
@@ -101,7 +105,9 @@ def run_eval(model_id: str, baseline: float, threshold: float) -> dict:
 
     scores = []
     for case in EVAL_CASES:
+        # Same configuration as production: the locked system prompt comes first.
         messages = [
+            {"role": "system", "content": PRODUCTION_SYSTEM_PROMPT},
             {"role": "user", "content": case["prompt"]},
         ]
         input_ids = tokenizer.apply_chat_template(
