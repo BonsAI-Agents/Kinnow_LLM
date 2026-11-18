@@ -17,6 +17,9 @@ from guardrails import layer2_classifier
 from guardrails.pipeline import KinnowGuardrailPipeline
 from serve import circuit_breaker, vllm_client
 from serve.routes import chat as chat_routes
+from tests.conftest import TEST_API_KEY, TEST_OWNER
+
+AUTH = {"Authorization": f"Bearer {TEST_API_KEY}"}
 
 GOOD_REPLY = (
     "The GST rate on restaurant services is 5% under SAC code 996331. "
@@ -53,6 +56,7 @@ def client(monkeypatch, fake_redis, tmp_path, seen_messages):
         return GOOD_REPLY
 
     with TestClient(appmod.app) as c:
+        c.headers.update(AUTH)
         chat_routes.set_pipeline(KinnowGuardrailPipeline(model_fn=model_fn))
         yield c
 
@@ -74,7 +78,7 @@ class TestChatHappyPath:
 
     def test_the_turn_is_saved_to_the_session(self, client, fake_redis):
         chat(client, IN_SCOPE)
-        history = json.loads(fake_redis.store["session:s1"])
+        history = json.loads(fake_redis.store[f"session:{TEST_OWNER}:s1"])
         assert history == [{"role": "user", "content": IN_SCOPE}, {"role": "assistant", "content": GOOD_REPLY}]
 
     def test_history_is_sent_back_to_the_model_on_the_next_turn(self, client, seen_messages):
@@ -93,7 +97,7 @@ class TestChatHappyPath:
     def test_stored_history_is_capped_at_six_exchanges(self, client, fake_redis):
         for _ in range(9):
             chat(client, IN_SCOPE)
-        assert len(json.loads(fake_redis.store["session:s1"])) == 12
+        assert len(json.loads(fake_redis.store[f"session:{TEST_OWNER}:s1"])) == 12
 
     def test_session_id_defaults_to_anonymous(self, client):
         r = client.post("/v1/chat", json={"message": IN_SCOPE})
@@ -116,7 +120,7 @@ class TestChatGuardrails:
         assert body["block_reason"] == "oos_query"
         assert "Kinnow's ERP assistant" in body["response"]
         assert seen_messages == []                    # the model was never called
-        assert "session:s1" not in fake_redis.store   # refusals are not remembered
+        assert f"session:{TEST_OWNER}:s1" not in fake_redis.store   # refusals are not remembered
 
     def test_injection_is_blocked_before_the_model(self, client, seen_messages):
         body = chat(client, INJECTION).json()
@@ -128,7 +132,7 @@ class TestChatGuardrails:
         body = chat(client, "what is the rate?").json()
         assert body["blocked"] is False
         assert body["block_reason"] == "clarification_requested"
-        assert seen_messages == [] and "session:s1" not in fake_redis.store
+        assert seen_messages == [] and f"session:{TEST_OWNER}:s1" not in fake_redis.store
 
     def test_repeated_off_topic_questions_trigger_the_rate_limit(self, client):
         for _ in range(10):
@@ -440,6 +444,7 @@ class TestLifespan:
             ),
         )
         with TestClient(appmod.app) as c:
+            c.headers.update(AUTH)
             body = chat(c, IN_SCOPE).json()
         assert body["response"] == GOOD_REPLY and body["blocked"] is False
 

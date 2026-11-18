@@ -7,6 +7,7 @@ Run:
            --users 50 --spawn-rate 5 --run-time 10m --headless
 """
 
+import os
 import uuid
 from locust import HttpUser, task, between, events
 from tests.load.scenarios import weighted_query, random_erp
@@ -17,6 +18,11 @@ class KinnowUser(HttpUser):
 
     def on_start(self):
         self.session_id = str(uuid.uuid4())
+        # The endpoints require authentication: pass a key the server accepts (API_KEY_PROD / API_KEY_NEW).
+        api_key = os.environ.get('API_KEY', '')
+        if not api_key:
+            raise SystemExit('Set the API_KEY environment variable to a key the server accepts.')
+        self.client.headers.update({'Authorization': f'Bearer {api_key}'})
 
     @task(7)
     def chat_erp(self):

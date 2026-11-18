@@ -4,8 +4,12 @@ import pytest
 
 from guardrails.pipeline import reset_oos_tracker
 from guardrails import layer2_classifier
-from serve import circuit_breaker, redis_client, vllm_client
+from serve import auth, circuit_breaker, redis_client, vllm_client
 from serve.routes import chat
+
+
+TEST_API_KEY = "test-key-prod"
+TEST_OWNER = auth.owner_id(TEST_API_KEY)
 
 
 class FakeRedis:
@@ -49,6 +53,10 @@ def _clean_global_state(monkeypatch):
     monkeypatch.setattr(chat, "_pipeline", None)
     monkeypatch.setattr(redis_client, "_redis", None)
     monkeypatch.setattr(vllm_client, "_client", None)
+    monkeypatch.setattr(auth, "_owners", {})
+    monkeypatch.setenv("API_KEY_PROD", TEST_API_KEY)
+    monkeypatch.delenv("API_KEY_NEW", raising=False)
+    monkeypatch.delenv("ENV", raising=False)
     yield
     layer2_classifier.set_domain_centroids({})
     reset_oos_tracker()

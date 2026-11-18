@@ -21,6 +21,7 @@ import numpy as np
 from fastapi import FastAPI
 from prometheus_client import make_asgi_app
 
+from serve.auth import load_api_keys
 from serve.redis_client import init_redis, close_redis
 from serve.vllm_client import init_vllm_client, close_vllm_client, generate
 from serve.middleware import RequestLoggingMiddleware
@@ -39,6 +40,8 @@ CENTROIDS_PATH = os.getenv('CENTROIDS_PATH', 'data/centroids.npy')
 async def lifespan(app: FastAPI):
     # --- Startup ---
     print("Starting Kinnow ERP LLM API server…")
+
+    print(f"  ✓ API keys loaded ({load_api_keys()})")
 
     await init_redis()
     print("  ✓ Redis connected")

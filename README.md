@@ -187,6 +187,8 @@ the item-by-item status.
 |---|---|---|
 | `VLLM_BASE_URL` | yes | Address of the vLLM inference server |
 | `REDIS_URL` | yes | Session history and rate-limit state |
+| `API_KEY_PROD` | yes | API key clients send as `Authorization: Bearer <key>` (24+ characters in production). The server refuses to start without it |
+| `API_KEY_NEW` | no | Second accepted key while rotating keys |
 | `CENTROIDS_PATH` | no | Domain centroid artefact (default `data/centroids.npy`) |
 | `MODEL_NAME` | no | Model name sent to vLLM (default `kinnow-v1`) |
 | `ENV` | no | `development` / `staging` / `production` |

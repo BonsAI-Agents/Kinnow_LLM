@@ -3,10 +3,11 @@ POST /v1/chat — main chat endpoint.
 Runs the full guardrail pipeline → vLLM → output validator → response.
 """
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel, field_validator
 
 from guardrails.pipeline import KinnowGuardrailPipeline
+from serve.auth import require_api_key
 from serve.redis_client import session_get, session_set
 from serve.metrics import OOS_RATE, BLOCK_COUNT
 
@@ -47,17 +48,17 @@ class ChatResponse(BaseModel):
 
 
 @router.post('/v1/chat', response_model=ChatResponse)
-async def chat(payload: ChatRequest, request: Request):
+async def chat(payload: ChatRequest, request: Request, owner: str = Depends(require_api_key)):
     session_id = payload.session_id
 
     # Load conversation history from Redis
-    history = await session_get(session_id)
+    history = await session_get(session_id, owner)
 
     try:
         result = await get_pipeline().process(
             query=payload.message,
             history=history,
-            user_id=session_id,
+            user_id=f'{owner}:{session_id}',    # rate-limit state is per key and session
         )
     except RuntimeError as e:
         err_msg = str(e)
@@ -78,7 +79,7 @@ async def chat(payload: ChatRequest, request: Request):
     if not result['blocked'] and result.get('messages_sent'):
         history.append({'role': 'user', 'content': payload.message})
         history.append({'role': 'assistant', 'content': result['response']})
-        await session_set(session_id, history[-12:])  # keep last 6 pairs
+        await session_set(session_id, history[-12:], owner=owner)  # keep last 6 pairs
 
     return ChatResponse(
         response=result['response'],

@@ -3,12 +3,13 @@ POST /v1/feedback — thumbs-up / thumbs-down on a model response.
 Thumbs-down entries queue to Redis for human review (data flywheel, Section 24).
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, field_validator
+from serve.auth import require_api_key
 from serve.redis_client import feedback_push
 from serve.metrics import FEEDBACK_COUNT
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_api_key)])
 
 
 class FeedbackRequest(BaseModel):

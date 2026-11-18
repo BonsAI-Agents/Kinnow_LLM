@@ -41,6 +41,11 @@ spec:
                 secretKeyRef:
                   name: kinnow-secrets
                   key: redis-url
+            - name: API_KEY_PROD
+              valueFrom:
+                secretKeyRef:
+                  name: kinnow-secrets
+                  key: api-key
             - name: VLLM_BASE_URL
               value: "http://kinnow-vllm:8001"
             - name: MODEL_NAME
