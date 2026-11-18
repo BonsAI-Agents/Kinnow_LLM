@@ -20,9 +20,23 @@ PII_PATTERNS = [
 
 # --- GST rate validation ---
 # GST has specific slabs. Flag anything else as likely hallucination.
-VALID_GST_RATES = {0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 7.5, 9, 12, 14, 18, 28}
+# Current structure (from 22 Sep 2025): 5% and 18% plus 40% for sin/luxury goods, and the
+# special rates 0.25%, 3% (gold) etc. The 12% and 28% slabs were abolished, so they are no
+# longer accepted: an answer quoting them gets the "verify with GSTN" caveat (still correct for
+# historical questions, just flagged). CGST/SGST are quoted as half rates (2.5, 9, 20, ...),
+# and composition / TDS / TCS under GST use 0.5, 1, 2, 6.
+VALID_GST_RATES = {
+    0, 0.05, 0.1, 0.125, 0.25, 0.5, 0.75, 1, 1.5, 2, 2.5, 3, 3.75, 5, 6, 7.5, 9, 18, 20, 40,
+}
 
 GST_RATE_PATTERN = re.compile(r'GST[^%\n]{0,30}?(\d+(?:\.\d+)?)\s*%', re.IGNORECASE)
+
+# A percentage near the word "GST" is not a GST rate when it is interest, a penalty or fee, or a
+# TDS/TCS figure ("interest under the GST Act is 24% per annum", "TDS is 2%").
+_NOT_A_RATE_CONTEXT = re.compile(
+    r'\b(tds|tcs|interest|penalt\w*|late fee|per annum|p\.a\.|per month|per day)\b|ब्याज|जुर्माना',
+    re.IGNORECASE,
+)
 
 # --- Output OOS keywords (Section 21a) ---
 # If response contains these AND no ERP signal words → flag as OOS slip-through
@@ -68,6 +82,9 @@ def check_gst_rates(text: str) -> list[dict]:
     """Return invalid GST rate claims in the response."""
     invalid = []
     for m in GST_RATE_PATTERN.finditer(text):
+        context = text[max(0, m.start() - 40):m.end() + 25]
+        if _NOT_A_RATE_CONTEXT.search(context):
+            continue
         try:
             rate = float(m.group(1))
             if rate not in VALID_GST_RATES:

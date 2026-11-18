@@ -104,3 +104,32 @@ class TestValidateOutputV2:
         text = "Today's weather is sunny and pleasant."
         result = validate_output_v2(text)
         assert any('oos_response' in i for i in result['issues'])
+
+
+class TestGstRateSet:
+    """The valid-rate set follows the structure in force from 22 Sep 2025."""
+
+    def test_current_slabs_are_accepted(self):
+        for rate in ("0", "5", "18", "40"):
+            assert check_gst_rates(f"The GST rate is {rate}% on this supply.") == []
+
+    def test_cgst_sgst_half_rates_are_accepted(self):
+        assert check_gst_rates("CGST 2.5% plus SGST 2.5% applies on a 5% supply.") == []
+        assert check_gst_rates("GST 9% CGST and 9% SGST on an 18% supply.") == []
+        assert check_gst_rates("Composition tax is 1%: CGST 0.5% and SGST 0.5%.") == []
+
+    def test_abolished_slabs_are_flagged(self):
+        for rate in (12, 28):
+            errors = check_gst_rates(f"The GST rate is {rate}% on this supply.")
+            assert [e['claimed_rate'] for e in errors] == [float(rate)]
+
+    @pytest.mark.parametrize("rate", [10, 13, 15, 22, 35])
+    def test_made_up_rates_are_flagged(self, rate):
+        assert check_gst_rates(f"The GST rate is {rate}% on this supply.")
+
+    def test_tds_percentage_near_gst_is_not_a_rate(self):
+        assert check_gst_rates("TDS under GST is 2% of the payment.") == []
+
+    def test_interest_and_penalty_percentages_are_not_rates(self):
+        assert check_gst_rates("Interest under the GST Act is 24% per annum on wrongly availed ITC.") == []
+        assert check_gst_rates("GST देर से जमा करने पर 24% ब्याज लगता है।") == []
