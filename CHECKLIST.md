@@ -9,7 +9,7 @@ Legend: ✅ Done | 🔄 In Progress | ⬜ Pending | ⏳ Blocked (waiting on exte
 
 | # | Item | Status |
 |---|------|--------|
-| 1.1 | `guardrails/layer4_injection.py` — sanitize + injection detection (25 patterns) | ✅ Done |
+| 1.1 | `guardrails/layer4_injection.py` — sanitize + injection detection (~45 patterns, unicode/zero-width/hyphen folding) | ✅ Done, hardened 2026-11-18 |
 | 1.2 | `guardrails/layer2_classifier.py` — keyword + embedding classifier | ✅ Done |
 | 1.3 | `guardrails/layer1_system_prompt.py` — system prompt lock + history sanitization | ✅ Done |
 | 1.4 | `guardrails/layer3_output_validator.py` — PII, GST rate, OOS topic check | ✅ Done |
@@ -62,16 +62,21 @@ Legend: ✅ Done | 🔄 In Progress | ⬜ Pending | ⏳ Blocked (waiting on exte
 |---|------|--------|
 | 4.1 | `serve/app.py` — FastAPI app skeleton + lifespan (load model, build centroids) | ✅ Done |
 | 4.2 | `serve/routes/chat.py` — `POST /v1/chat` endpoint with guardrail pipeline | ✅ Done |
-| 4.3 | `serve/routes/health.py` — `GET /health` + `GET /ready` endpoints | ✅ Done |
-| 4.4 | `serve/routes/feedback.py` — `POST /v1/feedback` (thumbs-up/down for data flywheel) | ✅ Done |
+| 4.3 | `serve/routes/health.py` — `GET /health` (status, model_version, uptime) + `GET /ready` | ✅ Done |
+| 4.4 | `serve/routes/feedback.py` — `POST /v1/feedback` per plan 11a (`request_id` + 1-5 rating, 204; thumbs-down text kept 1h for review) | ✅ Done 2026-11-18 |
 | 4.5 | `serve/vllm_client.py` — vLLM async client wrapper (model inference) | ✅ Done |
 | 4.6 | `serve/redis_client.py` — Redis session cache + rate-limit state | ✅ Done |
 | 4.7 | `serve/middleware.py` — request ID injection, structured JSON logging | ✅ Done |
 | 4.8 | `serve/metrics.py` — Prometheus counters (requests, latency, block rate by layer) | ✅ Done |
 | 4.9 | `serve/circuit_breaker.py` — circuit breaker wrapper around model calls | ✅ Done — fixed 2026-11-18: counts consecutive failures, no leaked coroutines, an open circuit now answers 503 |
 | 4.10 | `.env.example` — all required environment variables documented | ✅ Done |
-| 4.11 | `serve/auth.py` — Bearer API-key authentication on `/v1/chat` and `/v1/feedback`; sessions namespaced per key | ✅ Done 2026-11-18 (`API_KEY_PROD`, optional `API_KEY_NEW` for rotation; `/health`, `/ready`, `/metrics` stay open) |
+| 4.11 | `serve/auth.py` — Bearer API-key authentication on `/v1/chat` and `/v1/feedback`; sessions namespaced per key | ✅ Done 2026-11-18 (`API_KEY_PROD`, optional `API_KEY_NEW` for rotation; `/health`, `/ready` stay open; `/metrics` is internal only) |
 | 4.12 | `serve/rate_limiter.py` — Redis-backed off-topic rate limiter shared by all replicas (in-process fallback, bounded) | ✅ Done 2026-11-18 |
+| 4.14 | API contract per plan 11a (`user_id`, `request_id`, `blocked`, `guardrail_triggered`, `model_version`) | ✅ Done 2026-11-18 |
+| 4.15 | Per-user rate limit 20/min and 500/day -> 429 + `Retry-After` (`serve/rate_limit.py`) | ✅ Done 2026-11-18 |
+| 4.16 | Privacy-safe request logging, plan 13a (`serve/request_log.py`: lengths, category, guardrail, hashed user id) | ✅ Done 2026-11-18 |
+| 4.17 | `/metrics` internal only (`serve/internal_only.py`; ingress routes only `/v1` and `/health`) | ✅ Done 2026-11-18 |
+| 4.18 | Container runs as uid 1000 | ✅ Done 2026-11-18 (image rebuilt, `id` shows 1000) |
 | 4.13 | Centroids loaded without pickle (`.npz`); embedding model loaded at startup | ✅ Done 2026-11-18 |
 
 ---
@@ -112,6 +117,7 @@ Legend: ✅ Done | 🔄 In Progress | ⬜ Pending | ⏳ Blocked (waiting on exte
 |---|------|--------|
 | 7.1 | `tests/load/locustfile.py` — load test: 21 req/sec, p95 < 2s, 10 min ramp | ✅ Done |
 | 7.2 | `tests/load/scenarios.py` — mixed ERP + OOS + injection query scenarios | ✅ Done |
+| 7.4 | Adversarial suite — `data/eval/injection_suite.jsonl` (58 attacks) + `eval/run_adversarial.py`, 100% block gate in CI (plan 7d) | ✅ Done 2026-11-18 (58/58, each by the expected guardrail) |
 | 7.3 | Security scan integration in CI (Trivy for Docker image, Bandit for Python) | ✅ Done |
 
 ---

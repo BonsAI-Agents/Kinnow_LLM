@@ -81,9 +81,35 @@ query
   → response
 ```
 
-Classifier thresholds: **≥0.65** pass · **0.45–0.65** ask for clarification ·
-**<0.45** block (when in doubt, block). A user who sends 10 out-of-scope
+Classifier thresholds: **≥0.50** pass · **0.35–0.50** ask for clarification ·
+**<0.35** block (when in doubt, block); with an ERP keyword present they are
+0.35 / 0.20, and 0.10 lower for Hindi. A user who sends 10 out-of-scope
 queries in 5 minutes is rate limited for 10 minutes and raises a security event.
+
+### API (plan section 11a)
+
+All `/v1` endpoints need `Authorization: Bearer <API_KEY_PROD>`.
+
+```bash
+curl -X POST http://localhost:8000/v1/chat \
+  -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
+  -d '{"user_id": "u-42", "session_id": "s-1", "message": "What is the GST rate on laptops?"}'
+```
+
+Response: `response`, `blocked`, `category_detected`, `guardrail_triggered`
+(`injection_defense`, `input_classifier`, `output_validator`, `rate_limiter`, ...),
+`latency_ms`, `session_id`, `model_version`, `request_id`.
+
+- **Rate limit:** 20 requests a minute and 500 a day per user (`RATE_LIMIT_PER_MINUTE/DAY`);
+  beyond that, HTTP 429 with a `Retry-After` header.
+- **Feedback:** `POST /v1/feedback` with `user_id`, `session_id`, `request_id` and a 1-5
+  `rating`; answers 204. Ratings of 1-2 are queued for review with the text kept for one hour.
+- **Health:** `GET /health` returns `status`, `model_version`, `uptime_seconds`; `GET /ready` checks Redis and vLLM.
+- **`/metrics` is internal only.** Requests that came through the ingress (proxy headers present)
+  get 404, and the ingress routes only `/v1` and `/health`. Prometheus scrapes the pod directly.
+- **Logging is privacy-safe:** each request logs lengths, category, guardrail and a hashed user id,
+  never the message, the response or the raw user id.
+- The container runs as non-root uid 1000.
 
 ---
 
@@ -110,6 +136,7 @@ uvicorn serve.app:app --host 0.0.0.0 --port 8000 --workers 1
 curl http://localhost:8000/health
 python -m pytest tests/ -v
 python eval/eval_guardrails.py
+python eval/run_adversarial.py    # 58 injection/off-topic attacks, 100% must be blocked
 ```
 
 vLLM runs separately on a GPU host — see the model preparation steps below.
