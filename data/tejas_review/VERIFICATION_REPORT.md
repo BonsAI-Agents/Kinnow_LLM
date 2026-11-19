@@ -1,25 +1,31 @@
 # Verification report: claims in `FACTS_TO_VERIFY.md`
 
-Researched 19 Nov 2026 by Claude (web search against official and secondary sources). **This is a research
-aid, not a CA sign-off.** Almost all links are secondary sources (tax portals, law firms, news). A few are
-official (PIB, GST Council press release, Income Tax Department). I did not open the gazette PDFs, so a CA
-should confirm anything marked "Needs CA".
+Researched 19 Nov 2026 by Claude (two rounds of web search against official and secondary sources). **This is a
+research aid, not a CA sign-off.** Almost all links are secondary sources (tax portals, law firms, news). A few are
+official (PIB, GST Council press release, Income Tax Department FAQs, KPMG's note on the 2026 Rules). I did not
+open the gazette PDFs, so a CA should confirm anything marked "Needs CA".
 
 Status key: **Confirmed** = several independent sources agree (official source noted where there is one).
-**Partly** = the core is right, a detail is unconfirmed. **Conflict** = sources disagree. **Not found** = my
-search did not cover it. **Outdated?** = evidence says the data is behind current law.
+**Partly** = the core is right, a detail is unconfirmed. **Conflict** = sources disagree. **Outdated** = evidence
+says the data is behind current law.
 
-## Items that need action first
+## Items that need action
 
 | # | Claim in data | Finding | Action |
 |---|---|---|---|
-| 1 | Meal vouchers exempt up to Rs 50 per meal, old regime only (1 SFT row) | **Outdated?** The Rs 50 limit is the old Rules 1962 figure. The Income-tax Rules 2026 raise it to Rs 200 per meal from tax year 2026-27. Sources disagree on whether it covers both regimes. | CA to confirm Rule 15(5)(a) of the 2026 Rules; then rewrite the row. |
-| 2 | Forms 130/138 replace 16/24Q (SFT + my DPO pairs) | **Confirmed, but date matters.** FY 2025-26 salary TDS still uses the 1961 Act, Section 192, Form 16, Form 24Q. Forms 130/138 apply to tax year 2026-27 (salary paid from 1 Apr 2026). | I already added the date to my DPO pairs. Check Tejas's rows say "from tax year 2026-27". |
-| 3 | Interest 24% under Section 50(3) | **Conflict.** Sources disagree whether 24% still applies after the Finance Act 2022 change. | CA to confirm the notified rate. |
-| 4 | Maharashtra professional tax slabs | **Conflict.** Men's slabs differ between sources (Rs 7,500 / 10,000 / 175 / 200 vs a threshold of Rs 25,000). One source says the Rs 300 month is March, not February. | CA to check Schedule I of the Maharashtra Act. |
-| 5 | No-PAN TDS 20% (5% for goods); EPF 10% rate under 20 employees | **Not found** in my searches. | CA to confirm. |
-| 6 | GSTR-2B generated on the 14th; IMS "no action counts as accepted" | **Not found** in my searches. | CA / GST portal check. |
-| 7 | Overtime at 2x | **Partly.** Only one source. | CA to check the Code on Wages. |
+| 1 | Meal vouchers exempt up to Rs 50 per meal, old regime only, not available in the new regime (1 SFT row) | **Outdated.** The Income-tax Rules 2026 (notified 20 Mar 2026, effective 1 Apr 2026) raise the exemption to Rs 200 per meal under Rule 15(5)(a), and sources agree it applies under both regimes. The Rs 50 figure is the 1962 Rules limit and applies to FY 2025-26 and earlier. [KPMG](https://kpmg.com/xx/en/our-insights/gms-flash-alert/2026/flash-alert-2026-081.html), [BusinessToday](https://www.businesstoday.in/personal-finance/tax/story/rs200-per-meal-rule-explained-how-you-can-maximise-tax-savings-under-new-old-tax-regimes-526277-2026-04-18), [Tax2win](https://tax2win.in/guide/meal-voucher-itr-tax-saving-guide-india-2026) | Rewrite the row with a date split: Rs 50 up to FY 2025-26, Rs 200 per meal from tax year 2026-27. CA to confirm the rule text and conditions. |
+| 2 | Section 50(3): 24% interest on ITC wrongly availed and utilised (1 SFT row) | **Conflict.** Notification 13/2017 sets 24%, but one source says the Finance Act 2022 changed this to 18% retrospectively and a forum thread says that is unclear. Rule 88B(3) (interest runs from utilisation to reversal) is confirmed. [ClearTax Rule 88B](https://cleartax.in/s/rule-88b-of-cgst-rules-interest-calculation), [Teachoo, Notification 13/2017](https://www.teachoo.com/amp/6596/2144/CGST-Interest-Rates-Notified-(Notifications-13-2017)/category/Latest-GST-Notification), [TaxTMI forum](https://www.taxtmi.com/forum/issue?id=118761) | **Needs CA.** Hold this row out of training until confirmed. |
+| 3 | FY dates for forms (SFT rows and the 116 dropped old rows) | **Confirmed, and it matters.** FY 2025-26 salary TDS still uses the 1961 Act, Section 192, Form 16 and Form 24Q; Forms 130/138 apply from tax year 2026-27. Many dropped old rows are therefore correct for earlier periods. | Ask the CA whether dated versions of the dropped rows should be added back. My DPO pairs already carry the dates. |
+
+## Items closed in the second round
+
+| Claim | Status | Evidence |
+|---|---|---|
+| Without PAN: TDS at 20% or the normal rate if higher; 5% for purchase of goods (3 SFT rows) | **Confirmed.** Under the 2025 Act it is Section 397(2) (merging 206AA and 206CC), from 1 Apr 2026; 5% applies in the specified cases (194Q, 194-O). Section 206AB was omitted. | [Income Tax Dept: FAQs on Section 397](https://www.incometaxindia.gov.in/documents/d/guest/faqs-on-higher-rate-of-tds-under-section-397), [TDSMAN](https://blog.tdsman.com/2026/10/higher-rate-of-tds-for-non-furnishing-of-pan-section-3972-206aa-206cc/), [TaxTMI](https://www.taxtmi.com/tmi_blog_details?id=832373) |
+| GSTR-2B generated on the 14th; IMS "no action counts as accepted" | **Confirmed.** Records with no action are deemed accepted and flow into GSTR-2B; actions after the 14th need a recompute before GSTR-3B. One source claims IMS action became mandatory from April 2026; it is a single source, so not relied on. | [ClearTax IMS FAQs](https://cleartax.in/s/faqs-on-invoice-management-system-ims-gst), [Tally](https://tallysolutions.com/gst/ims-impact-on-gstr-2b-gstr-3b/) |
+| EPF 10% rate for establishments with fewer than 20 employees | **Partly.** EPFO's rate chart supports it. One source reports a new EPF Scheme 2026 (notified 29 Jun 2026); I could not check whether it changes this. | [EPFO contribution rate chart](https://www.epfindia.gov.in:443/site_docs/PDFs/MiscPDFs/ContributionRate.pdf), [FactoHR](https://factohr.com/epf-mp-act-1952/) |
+| Overtime at twice the normal rate | **Confirmed.** Section 14 of the Code on Wages sets overtime at no less than twice the normal rate, per extra hour. | [TaxManagementIndia](https://taxmanagementindia.com/visitor/detail_act.asp?ID=37235), [Taxmann](https://www.taxmann.com/post/blog/overtime-rules-code-on-wages-working-hours), [Nyaaya](https://nyaaya.org/themes/code-on-wages/) |
+| Maharashtra professional tax: men nil to Rs 7,500, Rs 175 for Rs 7,501-10,000, Rs 200 above (Rs 300 in February), Rs 2,500 a year; women exempt to Rs 25,000 | **Confirmed** by several sources (the women's Rs 25,000 limit dates from 1 Apr 2023; older Rs 10,000 figures are superseded). The official MAHAGST schedule PDF could not be read cleanly. One source (StartupGrantsIndia) shows different men's slabs and is the outlier. The claim that due dates moved to the 15th comes from a single source and is not used. | [Kredily](https://kredily.com/professional-tax-maharashtra/), [Patron](https://www.patronaccounting.com/tools/professional-tax-calculator), [GreytHR](https://www.greythr.com/wiki/acts/maharashtra-state-tax-on-professions-trades-callings-and-employments-acts-1975), [MAHAGST rate schedule](https://www.mahagst.gov.in/public/uploads/menufiles/PT%20Rate%20Schedule%20updated%20upto%2031.03.2025%20(1)%20(1).pdf) |
 
 ## A. GST rates (GST 2.0, 22 Sep 2025)
 
@@ -40,9 +46,8 @@ search did not cover it. **Outdated?** = evidence says the data is behind curren
 | Claim | Status | Evidence |
 |---|---|---|
 | GSTR-3B liability hard-locked from GSTR-1/1A, from the July 2025 period | **Confirmed** | [Taxscan](https://www.taxscan.in/breaking-gstn-issues-warning-on-hard-locking-of-auto-populated-values-in-gstr-3b/447890), [The Munim](https://themunim.com/blog/gstr-3b-autofill-facility/) |
-| IMS: accept / reject / pending | **Confirmed**; "no action = accepted" **Not found** | [The Munim](https://themunim.com/blog/gstr-3b-autofill-facility/) |
-| GSTR-1 on 11th, GSTR-3B on 20th, QRMP 22nd/24th, GSTR-7 on 10th | **Confirmed** (QRMP GSTR-1 is the 13th) | [ClearTax calendar](https://cleartax.in:443/s/gst-calendar), [Tally](https://tallysolutions.com/gst/gst-return-deadlines/) |
-| GSTR-2B on the 14th | **Not found** | |
+| IMS: accept / reject / pending; no action counts as accepted | **Confirmed** (see closed items) | [ClearTax IMS FAQs](https://cleartax.in/s/faqs-on-invoice-management-system-ims-gst) |
+| GSTR-1 on 11th, GSTR-3B on 20th, QRMP 22nd/24th, GSTR-7 on 10th, GSTR-2B on 14th | **Confirmed** (QRMP GSTR-1 is the 13th) | [ClearTax calendar](https://cleartax.in:443/s/gst-calendar), [Tally](https://tallysolutions.com/gst/gst-return-deadlines/), [Tally IMS](https://tallysolutions.com/gst/ims-impact-on-gstr-2b-gstr-3b/) |
 | Interest 18% under Section 50(1) | **Confirmed** | [ClearTax](https://cleartax.in/s/interest-under-section-50-cgst-act-2017) |
 | Interest 24% under Section 50(3) | **Conflict** (see top table) | [ClearTax](https://cleartax.in/s/interest-under-section-50-cgst-act-2017) |
 | E-invoice above Rs 5 crore | **Confirmed**, in force since 1 Aug 2023, not 1 Apr 2025 as the date column suggests | [The Tax Corp](https://thetaxcorp.in/article/navigating-the-dual-gst-e-invoicing-thresholds-the-rs-5-crore-mandate-vs-the-30), [Tally](https://tallysolutions.com/accounting/e-invoicing-rules-in-india/) |
@@ -60,22 +65,19 @@ search did not cover it. **Outdated?** = evidence says the data is behind curren
 | Quarterly statements 31 Jul / 31 Oct / 31 Jan / 31 May | **Confirmed** | [StudyCafe calendar](https://studycafe.in/tds-and-tcs-due-date-compliance-calendar-for-tax-year-2026-27-419614.html) |
 | TDS deposit by the 7th; March by 30 April | **Partly** (one transition guide, tied to the old challan structure) | [StudyCafe](https://studycafe.in/tds-and-tcs-due-date-compliance-calendar-for-tax-year-2026-27-419614.html) |
 | New regime: Rs 75,000 standard deduction; rebate to Rs 12 lakh (FY 2025-26) | **Confirmed**; sources say 2026-27 is unchanged | [Axis Max Life](https://www.axismaxlife.com/blog/tax-savings/new-tax-regime-fy-2025-26), [CAclubindia](https://www.caclubindia.com/articles/new-tax-regime-fy-202627-complete-slab-rebate-marginal-relief-reference-56353.asp) |
-| Meal vouchers Rs 50, old regime | **Outdated?** (see top table) | [AngelOne](https://www.angelone.in/news/taxation/meal-voucher-tax-rules-50-vs-200-exemption-explained-for-fy-2025-26), [Taxmann](https://www.taxmann.com/post/blog/opinion-meal-voucher-tax-benefit-under-new-tax-regime) |
+| Meal vouchers Rs 50, old regime only | **Outdated** (see top table) | [KPMG](https://kpmg.com/xx/en/our-insights/gms-flash-alert/2026/flash-alert-2026-081.html) |
 
-## D. EPF, ESI, labour codes, professional tax
+## D. EPF, ESI, labour codes
 
 | Claim | Status | Evidence |
 |---|---|---|
 | EPF wage ceiling Rs 25,000 from 17 Sep 2026 | **Confirmed** (official) | [PIB](https://www.pib.gov.in/PressReleasePage.aspx?PRID=2313829&reg=48&lang=2), [PIB (EPFO Goa)](https://www.pib.gov.in/PressReleasePage.aspx?PRID=2313790&reg=48&lang=2), [PM India: Cabinet approval](https://www.pmindia.gov.in/en/news_updates/cabinet-approves-enhancement-of-epfo-wage-ceiling-from-rs-15000-to-rs-25000-per-month/) |
 | Notification number S.O. 5109(E) | **Partly** (named in one source only) | [Upstox](https://upstox.com/news/personal-finance/latest-updates/epfo-wage-ceiling-hiked-to-25-000-labour-ministry-issues-gazette-notification/article-200466/) |
 | ESI ceiling Rs 21,000; 0.75% employee, 3.25% employer | **Confirmed** (one source mentions a proposed rise, not notified) | [ClearTax](https://cleartax.in/s/esic), [Petpooja](https://blog.petpooja.com/finance-compliance/esi-esic-contribution-rate-employer-employee-share/) |
-| EPF 10% rate for establishments with under 20 employees | **Not found** | |
 | Labour codes in force 21 Nov 2025 | **Confirmed** | [India Briefing](https://www.india-briefing.com/news/india-notifies-all-four-labor-codes-ushering-in-landmark-workforce-reforms-40874.html), [Bar & Bench](https://www.barandbench.com/view-point/labour-codes-key-highlights) |
 | Fixed-term gratuity after 1 year | **Confirmed** | [People Matters](https://www.peoplematters.in/news/economy-policy/indias-new-gratuity-rules-2025-what-employers-and-employees-should-know-47753) |
 | Full and final settlement within 2 working days | **Confirmed** | [India Briefing](https://www.india-briefing.com/news/india-notifies-all-four-labor-codes-ushering-in-landmark-workforce-reforms-40874.html) |
-| Overtime at 2x | **Partly** (one source) | [Bar & Bench](https://www.barandbench.com/view-point/labour-codes-key-highlights) |
-| Maharashtra professional tax slabs | **Conflict** (see top table) | [Kredily](https://kredily.com/professional-tax-maharashtra/), [StartupGrantsIndia](https://www.startupgrantsindia.com/hindi/calculators/operations/professional-tax/maharashtra), [Patron](https://www.patronaccounting.com/tools/professional-tax-calculator) |
 
 ## E. Kinnow product claims
 
-Cannot be checked from public sources. Only the Kinnow product owner can confirm them (the Tally bridge being free on every plan, ZATCA framework-only, GSP direct filing pilot-gated, the duplicate detector never merging on its own, and the rest of section B).
+Cannot be checked from public sources. Only the Kinnow product owner can confirm them (the Tally bridge being free on every plan, ZATCA framework-only, GSP direct filing pilot-gated, the duplicate detector never merging on its own, and the rest of section B of the checklist).
