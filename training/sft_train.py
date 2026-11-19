@@ -190,6 +190,9 @@ def main():
         output_dir=OUTPUT_DIR,
         max_steps=int(os.getenv("MAX_STEPS", "600")),
         per_device_train_batch_size=2,
+        # The default eval batch size is 8. On a T4 the logits of 8 long sequences (vocab 152k) need
+        # more than 3 GiB and crashed the first evaluation (step 100) with CUDA OOM, before any checkpoint.
+        per_device_eval_batch_size=1,
         gradient_accumulation_steps=4,
         learning_rate=2e-4,
         lr_scheduler_type="cosine",
