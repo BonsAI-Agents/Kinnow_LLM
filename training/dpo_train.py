@@ -27,10 +27,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from guardrails.layer1_system_prompt import PRODUCTION_SYSTEM_PROMPT  # noqa: E402
 
-SFT_ADAPTER_PATH = "models/sft_adapter"
-BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+# Match the SFT run: BASE_MODEL, SFT_ADAPTER_PATH and OUTPUT_DIR for the Qwen3 candidate
+SFT_ADAPTER_PATH = os.getenv("SFT_ADAPTER_PATH", "models/sft_adapter")
+BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 DPO_DATA_PATH = os.getenv("DPO_DATA_PATH", "data/v2_training/dpo_pairs.jsonl")
-OUTPUT_DIR = "models/dpo_adapter"
+OUTPUT_DIR = os.getenv("OUTPUT_DIR", "models/dpo_adapter")
 HF_REPO = os.getenv("HF_REPO", "KaraPatelDev/kinnow-v1")
 MAX_LENGTH = 1024          # plan 4g
 MAX_PROMPT_LENGTH = 512    # plan 4g
@@ -47,7 +48,7 @@ def format_pair(row: dict, tokenizer) -> dict:
     prompt = tokenizer.apply_chat_template(
         [{"role": "system", "content": PRODUCTION_SYSTEM_PROMPT},
          {"role": "user", "content": row["prompt"]}],
-        tokenize=False, add_generation_prompt=True)
+        tokenize=False, add_generation_prompt=True, enable_thinking=False)
     return {"prompt": prompt, "chosen": row["chosen"] + EOS, "rejected": row["rejected"] + EOS}
 
 

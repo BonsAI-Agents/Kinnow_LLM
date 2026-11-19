@@ -25,13 +25,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from guardrails.layer1_system_prompt import PRODUCTION_SYSTEM_PROMPT  # noqa: E402
 
-BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+# BASE_MODEL=Qwen/Qwen3-8B trains the Qwen3 candidate; set OUTPUT_DIR and HF_REPO too so the two runs
+# do not overwrite each other.
+BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 HF_REPO = os.getenv("HF_REPO", "KaraPatelDev/kinnow-v1")
 # DATA_DIR=data/v2_training trains on the merged set (Tejas's data + our non-conflicting rows)
 DATA_DIR = os.getenv("DATA_DIR", "data/v1_training")
 TRAIN_PATH = f"{DATA_DIR}/train.jsonl"
 VAL_PATH = f"{DATA_DIR}/val.jsonl"
-OUTPUT_DIR = "models/sft_adapter"
+OUTPUT_DIR = os.getenv("OUTPUT_DIR", "models/sft_adapter")
 MAX_SEQ_LENGTH = 1024
 
 # Qwen chat template: the reply starts right after this marker. Only tokens after it get a loss.
@@ -50,7 +52,10 @@ def format_example(ex: dict, tokenizer) -> str:
         {"role": "user", "content": ex["prompt"]},
         {"role": "assistant", "content": ex["completion"]},
     ]
-    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+    # enable_thinking=False: Qwen3's template otherwise lets the model open a <think> block. The server
+    # must send the same flag. Qwen2.5's template ignores it.
+    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False,
+                                         enable_thinking=False)
 
 
 def response_start(input_ids: list[int], template_ids: list[int]) -> int:

@@ -30,7 +30,7 @@ def test_marker_at_the_very_end_leaves_no_answer():
 
 def test_script_trains_with_the_production_system_prompt():
     class Tok:
-        def apply_chat_template(self, messages, tokenize, add_generation_prompt):
+        def apply_chat_template(self, messages, tokenize, add_generation_prompt, **kwargs):
             return "|".join(m["role"] + ":" + m["content"] for m in messages)
 
     text = sft.format_example({"prompt": "q", "completion": "a"}, Tok())

@@ -53,6 +53,9 @@ async def generate(messages: list[dict], max_tokens: int = DEFAULT_MAX_TOKENS) -
         'temperature': DEFAULT_TEMPERATURE,
         'top_p': DEFAULT_TOP_P,
         'stream': False,
+        # Qwen3 chat templates can open a <think> block unless told not to; training used the same
+        # flag (training/sft_train.py). Qwen2.5's template ignores it.
+        'chat_template_kwargs': {'enable_thinking': False},
     })
     resp.raise_for_status()
 
