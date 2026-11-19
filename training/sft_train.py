@@ -27,8 +27,10 @@ from guardrails.layer1_system_prompt import PRODUCTION_SYSTEM_PROMPT  # noqa: E4
 
 BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 HF_REPO = os.getenv("HF_REPO", "KaraPatelDev/kinnow-v1")
-TRAIN_PATH = "data/v1_training/train.jsonl"
-VAL_PATH = "data/v1_training/val.jsonl"
+# DATA_DIR=data/v2_training trains on the merged set (Tejas's data + our non-conflicting rows)
+DATA_DIR = os.getenv("DATA_DIR", "data/v1_training")
+TRAIN_PATH = f"{DATA_DIR}/train.jsonl"
+VAL_PATH = f"{DATA_DIR}/val.jsonl"
 OUTPUT_DIR = "models/sft_adapter"
 MAX_SEQ_LENGTH = 1024
 

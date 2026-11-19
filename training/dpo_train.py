@@ -24,7 +24,7 @@ from trl import DPOTrainer, DPOConfig
 
 SFT_ADAPTER_PATH = "models/sft_adapter"
 BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
-DPO_DATA_PATH = "data/v1_training/dpo_pairs.jsonl"
+DPO_DATA_PATH = os.getenv("DPO_DATA_PATH", "data/v2_training/dpo_pairs.jsonl")
 OUTPUT_DIR = "models/dpo_adapter"
 HF_REPO = os.getenv("HF_REPO", "KaraPatelDev/kinnow-v1")
 
