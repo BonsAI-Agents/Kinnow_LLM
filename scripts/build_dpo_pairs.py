@@ -100,7 +100,7 @@ A_LAW = [
      "Rs 1.5 crore of turnover (Rs 50 lakh for service providers), at 1%, 5% or 6%.",
      "Rs 75 lakh of turnover for everyone."),
     ("What interest applies on late GST payment?",
-     "18% a year under Section 50(1). For ITC wrongly availed and used it is 24% under Section 50(3).",
+     "18% a year under Section 50(1) on tax paid late.",
      "12% a year on all late payments."),
     ("GST TDS rate on a government contract of Rs 10 lakh?",
      "2% under Section 51 of the CGST Act, as the contract value is above Rs 2.5 lakh.",

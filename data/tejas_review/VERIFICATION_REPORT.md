@@ -9,6 +9,13 @@ Status key: **Confirmed** = several independent sources agree (official source n
 **Partly** = the core is right, a detail is unconfirmed. **Conflict** = sources disagree. **Outdated** = evidence
 says the data is behind current law.
 
+## Applied in the training data (19 Nov 2026, without waiting for the CA)
+
+`scripts/merge_tejas_data.py` now (a) rewrites the meal-voucher row to the Rs 200 / Rs 50 date split, leaving the
+regime question out, and (b) holds out every row that states the Section 50(3) rate: 14 rows (1 of Tejas's, 13 of
+ours) in `data/v2_training/held_for_verification.jsonl`. My DPO pair on interest no longer states 24%. Tejas's
+original files in `data/tejas/` are unchanged. Merged set: 2,291 SFT rows, 100 DPO pairs.
+
 ## Items that need action
 
 | # | Claim in data | Finding | Action |

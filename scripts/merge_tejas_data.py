@@ -36,6 +36,25 @@ OLD_REGIME = {
 }
 
 
+# Rows held out of training until a CA confirms them (data/tejas_review/VERIFICATION_REPORT.md).
+# Section 50(3): sources disagree on whether the rate is still 24%.
+HOLD = {
+    "Section 50(3) interest rate (unconfirmed)":
+        r"(?i)50\(3\)|\b24% (p\.a\.?|per annum|a year|interest)|interest at 24%|24% interest",
+}
+
+# Tejas rows rewritten because the law moved on: prompt -> new completion.
+# Meal vouchers: Income-tax Rules 2026 (Rule 15(5)(a)) raised Rs 50 to Rs 200 per meal from tax year 2026-27.
+# The regime question is left out on purpose: sources disagree and the CA has not confirmed it.
+OVERRIDES = {
+    "Are meal vouchers taxable for employees?":
+        "Employer-provided meals, or vouchers usable only at eating places, are exempt up to Rs 200 per meal "
+        "during working hours from tax year 2026-27, under Rule 15(5)(a) of the Income-tax Rules, 2026. "
+        "Up to FY 2025-26 the limit was Rs 50 per meal. A cash meal allowance is added to salary and fully taxed, "
+        "as is any value above the limit.",
+}
+
+
 def load(path: Path) -> list[dict]:
     with open(path, encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
@@ -52,9 +71,32 @@ def old_regime_reasons(row: dict) -> list[str]:
 
 def main():
     tejas, v1 = load(TEJAS), load(V1)
+    held = []
+
+    def hold_reasons(row: dict) -> list[str]:
+        text = row["prompt"] + " " + row["completion"]
+        return [name for name, pat in HOLD.items() if re.search(pat, text)]
+
+    rewritten = 0
+    kept_tejas = []
+    for r in tejas:
+        if r["prompt"].strip() in OVERRIDES:
+            r = {**r, "completion": OVERRIDES[r["prompt"].strip()]}
+            rewritten += 1
+        reasons = hold_reasons(r)
+        if reasons:
+            held.append({**r, "reason": reasons, "source": "tejas"})
+        else:
+            kept_tejas.append(r)
+    tejas_rows_in = len(tejas)
+    tejas = kept_tejas
     seen = {norm(r["prompt"]) for r in tejas}
     kept, dropped, dup = [], [], 0
     for r in v1:
+        reasons = hold_reasons(r)
+        if reasons:
+            held.append({**r, "reason": reasons, "source": "v1"})
+            continue
         if norm(r["prompt"]) in seen:
             dup += 1
             continue
@@ -74,8 +116,16 @@ def main():
         for r in dropped:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
+    with open(OUT / "held_for_verification.jsonl", "w", encoding="utf-8", newline="\n") as f:
+        for r in held:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
     manifest = {
+        "tejas_rows_received": tejas_rows_in,
         "tejas_rows": len(tejas),
+        "tejas_rows_rewritten": rewritten,
+        "rows_held_for_verification": len(held),
+        "held_by_source": dict(Counter(r["source"] for r in held)),
         "v1_rows_kept": len(kept),
         "v1_rows_dropped_old_regime": len(dropped),
         "v1_rows_dropped_same_prompt_as_tejas": dup,
