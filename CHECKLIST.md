@@ -46,7 +46,7 @@ Legend: ✅ Done | 🔄 In Progress | ⬜ Pending | ⏳ Blocked (waiting on exte
 | # | Item | Status |
 |---|------|--------|
 | 3.1 | `training/sft_train.py` — QLoRA SFT training script (Qwen2.5-7B, r=64, α=128) | ✅ Script written — now prepends `PRODUCTION_SYSTEM_PROMPT` (plan §4e); longest example 803 tokens vs `max_seq_length=1024`. Aligned with plan 4d/4f on 2026-11-18: fp16 on a T4 and bf16 on Ampere (auto-detected), loss on the assistant reply only (85% of tokens were prompt), batch 2x4, 600 steps, gradient checkpointing, adamw_8bit, cosine. `--dry-run` checks the data and mask without a GPU. Not yet run |
-| 3.2 | `training/dpo_train.py` — DPO preference alignment script | ✅ Script written — ⚠ learning rate is 5e-5 but the plan says 5e-6; check before running |
+| 3.2 | `training/dpo_train.py` — DPO preference alignment script | ✅ Script aligned with plan 4g on 2026-11-19: learning rate 5e-6, batch 1 x 8, production system prompt and chat template, auto fp16/bf16, `--dry-run`. Keeps a frozen SFT reference model (the plan's `ref_model=None` would use the plain base). Data: `data/v2_training/dpo_pairs.jsonl` (100 pairs, 57 added by us, unreviewed). Not yet run, needs the SFT adapter first |
 | 3.3 | `training/merge_adapter.py` — merge LoRA adapter into base model | ✅ Script written |
 | 3.4 | `training/quantize_awq.py` — AWQ 4-bit compression (15 GB → 4.5 GB) | ✅ Script written |
 | 3.5 | `eval/eval_model.py` — post-training eval gate (must beat baseline before accepting) | ✅ Script written — now sends the production system prompt; superseded by the fuller `eval/run_full_eval.py` |
