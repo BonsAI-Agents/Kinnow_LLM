@@ -128,7 +128,9 @@ def main():
 
     if not torch.cuda.is_available():
         sys.exit("No GPU found. Run this on Kaggle/Colab (use --dry-run to check the data without one).")
-    use_bf16 = torch.cuda.is_bf16_supported()      # T4 is not: it needs fp16 (plan 4d)
+    # Real bf16 needs an Ampere GPU (compute capability 8+). A T4 is 7.5: recent PyTorch still reports
+    # is_bf16_supported() = True there (slow emulation), so check the capability, not that flag.
+    use_bf16 = torch.cuda.get_device_capability()[0] >= 8
     compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
     print(f"Base model: {BASE_MODEL}\nOutput: {OUTPUT_DIR}\nPrecision: {'bf16' if use_bf16 else 'fp16'}")
 
@@ -207,7 +209,8 @@ def main():
         group_by_length=True,
         report_to="none",                    # set to "wandb" if using W&B
         dataloader_num_workers=2,
-        remove_unused_columns=False,
+        # Do NOT set remove_unused_columns=False: trl 0.11 then keeps the raw "text" column and the
+        # collator crashes at step 0 trying to pad it ("excessive nesting"). Found on Kaggle.
     )
 
     trainer = SFTTrainer(

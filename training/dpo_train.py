@@ -101,7 +101,8 @@ def main():
         sys.exit("No GPU found. Run this on Kaggle/Colab (use --dry-run to check the data without one).")
     if not Path(SFT_ADAPTER_PATH).exists():
         sys.exit(f"{SFT_ADAPTER_PATH} not found. Run training/sft_train.py first (DPO refines the SFT model).")
-    use_bf16 = torch.cuda.is_bf16_supported()      # a T4 is not: it needs fp16
+    # Real bf16 needs compute capability 8+ (a T4 is 7.5; is_bf16_supported() lies there via emulation)
+    use_bf16 = torch.cuda.get_device_capability()[0] >= 8
     compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
     print(f"Precision: {'bf16' if use_bf16 else 'fp16'}")
 
