@@ -3,6 +3,39 @@
 Same data, same settings, only the base model differs. Each run gets its own output folder and Hugging Face
 repo so nothing is overwritten. `<user>` is your Hugging Face username. Run on Kaggle/Colab, one run per session.
 
+## Kaggle setup (tested 19 Nov 2026, GPU T4 x2, internet on)
+
+Kaggle's default image is now Python 3.13 with torch 2.11 / transformers 5.x, and the pinned stack in
+`requirements-train.txt` cannot install there. Build a Python 3.11 environment next to it instead:
+
+```
+!git clone --depth 1 https://github.com/BonsAI-Agents/Kinnow_LLM.git /kaggle/working/Kinnow_LLM
+%cd /kaggle/working/Kinnow_LLM
+!pip install -q uv
+!uv venv --python 3.11 /kaggle/working/venv
+!uv pip install --python /kaggle/working/venv/bin/python -r training/requirements-train.txt
+# extras the pinned set needs on a fresh venv (found the hard way):
+!uv pip install --python /kaggle/working/venv/bin/python setuptools wheel rich "datasets==2.21.0" "pyarrow==17.0.0"
+```
+
+Then run every script with `/kaggle/working/venv/bin/python` (the install takes about 8 minutes). Add the
+`HF_TOKEN` secret under Add-ons > Secrets and attach it to the notebook. Create the Hugging Face repo as private
+before training so the final push cannot publish an unreviewed model:
+
+```
+import os
+from kaggle_secrets import UserSecretsClient
+from huggingface_hub import create_repo
+os.environ["HF_TOKEN"] = UserSecretsClient().get_secret("HF_TOKEN")
+os.environ["HF_REPO"] = "<user>/kinnow-test-qwen25"
+os.environ["DATA_DIR"] = "data/v2_training"
+os.environ["OUTPUT_DIR"] = "models/sft_qwen25"
+create_repo(os.environ["HF_REPO"] + "-sft-adapter", private=True, exist_ok=True, token=os.environ["HF_TOKEN"])
+```
+
+Speed: about 25 seconds a step on two T4s (naive model split, so one GPU works at a time), so the 600-step
+SFT run takes roughly 4 to 5 hours of the 30 weekly GPU hours.
+
 ## 0. Data (once per session)
 
 ```bash
