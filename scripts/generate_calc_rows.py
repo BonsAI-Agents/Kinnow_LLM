@@ -109,12 +109,12 @@ def p_gratuity(rng):
     y = years + 1 if months >= 6 else years
     amt, capped = gratuity(w, y)
     q = rng.choice([
-        f"An employee served {pl(years, "year")} {pl(months, "month")}. Last drawn basic plus DA is {inr(w)} a month. Gratuity payable?",
-        f"Gratuity for {pl(years, "year")} and {pl(months, "month")} of service with last drawn wages (basic + DA) of {inr(w)} per month?",
-        f"Employee resigns after {pl(years, "year")} {pl(months, "month")}, last drawn basic and DA {inr(w)}. Work out the gratuity.",
+        f"An employee served {pl(years, 'year')} {pl(months, 'month')}. Last drawn basic plus DA is {inr(w)} a month. Gratuity payable?",
+        f"Gratuity for {pl(years, 'year')} and {pl(months, 'month')} of service with last drawn wages (basic + DA) of {inr(w)} per month?",
+        f"Employee resigns after {pl(years, 'year')} {pl(months, 'month')}, last drawn basic and DA {inr(w)}. Work out the gratuity.",
     ])
     rounding = ("more than 6 months rounds up" if months >= 6 else "months up to 6 are ignored")
-    a = (f"Gratuity = last drawn wages x 15/26 x completed years of service. {pl(years, "year")} {pl(months, "month")} counts as {y} years "
+    a = (f"Gratuity = last drawn wages x 15/26 x completed years of service. {pl(years, 'year')} {pl(months, 'month')} counts as {y} years "
          f"({rounding}). {inr(w)} x 15/26 x {y} = {inr(amt if not capped else rup(Decimal(w) * 15 / 26 * y))}.")
     if capped:
         a += f" Gratuity is capped at {inr(2_000_000)}, so {inr(2_000_000)} is payable."
@@ -128,11 +128,11 @@ def p_gratuity_fixed(rng):
     y = years + 1 if months >= 6 else years
     amt, _ = gratuity(w, y)
     q = rng.choice([
-        f"A fixed-term employee completed {pl(years, "year")} {pl(months, "month")}. Last drawn wages {inr(w)} a month. Is gratuity payable, and how much?",
-        f"Fixed-term contract employee leaves after {pl(years, "year")} {pl(months, "month")}, last drawn wages {inr(w)}. Gratuity?",
+        f"A fixed-term employee completed {pl(years, 'year')} {pl(months, 'month')}. Last drawn wages {inr(w)} a month. Is gratuity payable, and how much?",
+        f"Fixed-term contract employee leaves after {pl(years, 'year')} {pl(months, 'month')}, last drawn wages {inr(w)}. Gratuity?",
     ])
     a = (f"Yes. Under the labour codes a fixed-term employee is eligible for gratuity after 1 year of service. "
-         f"Gratuity = {inr(w)} x 15/26 x {pl(y, "year")} = {inr(amt)}.")
+         f"Gratuity = {inr(w)} x 15/26 x {pl(y, 'year')} = {inr(amt)}.")
     return "PAYROLL", q, a
 
 
