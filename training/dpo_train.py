@@ -114,7 +114,9 @@ def main():
     )
 
     tokenizer = AutoTokenizer.from_pretrained(SFT_ADAPTER_PATH)
-    tokenizer.pad_token = tokenizer.eos_token
+    # Pad must differ from <|im_end|>, or the end-of-answer token is masked out of the loss
+    if tokenizer.pad_token_id is None or tokenizer.pad_token_id == tokenizer.convert_tokens_to_ids(EOS):
+        tokenizer.pad_token = "<|endoftext|>"
 
     rows = load_jsonl(DPO_DATA_PATH)
     if not check_pairs(tokenizer, rows):

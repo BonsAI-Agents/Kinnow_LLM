@@ -58,6 +58,35 @@ def format_example(ex: dict, tokenizer) -> str:
                                          enable_thinking=False)
 
 
+END_TOKEN = "<|im_end|>"
+
+
+def set_distinct_pad_token(tokenizer) -> None:
+    """The pad token must differ from the end-of-turn token.
+
+    The collator sets every label equal to the pad token id to -100. With pad == <|im_end|> (what
+    `pad_token = eos_token` gives on Qwen) the end of every answer is masked out of the loss, so the model
+    never learns to stop and rambles to the token cap. Found in the first eval (median 205-word answers
+    against about 40 in the training data).
+    """
+    end_id = tokenizer.convert_tokens_to_ids(END_TOKEN)
+    if tokenizer.pad_token_id is None or tokenizer.pad_token_id == end_id:
+        tokenizer.pad_token = "<|endoftext|>"
+    if tokenizer.pad_token_id == end_id or tokenizer.pad_token_id is None:
+        raise RuntimeError("Could not pick a pad token different from <|im_end|>.")
+
+
+def check_end_token_trained(tokenizer, collator, rows: list[dict]) -> None:
+    """Fail loudly if <|im_end|> would not carry a loss label for a sample of rows."""
+    end_id = tokenizer.convert_tokens_to_ids(END_TOKEN)
+    for ex in rows[:8]:
+        ids = tokenizer(format_example(ex, tokenizer), add_special_tokens=False)["input_ids"]
+        labels = collator([{"input_ids": ids}])["labels"][0].tolist()
+        if end_id not in labels:
+            raise RuntimeError("<|im_end|> is masked out of the loss: the model would not learn to stop.")
+    print(f"  end-of-answer token {END_TOKEN} carries a loss label: OK ({min(8, len(rows))} rows checked)")
+
+
 def response_start(input_ids: list[int], template_ids: list[int]) -> int:
     """Index of the first token after the LAST assistant marker, or -1 if the marker is missing."""
     n = len(template_ids)
@@ -143,7 +172,7 @@ def main():
     )
 
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, trust_remote_code=True)
-    tokenizer.pad_token = tokenizer.eos_token
+    set_distinct_pad_token(tokenizer)
     tokenizer.padding_side = "right"
 
     model = AutoModelForCausalLM.from_pretrained(
@@ -184,6 +213,7 @@ def main():
         response_template=tokenizer.encode(RESPONSE_TEMPLATE, add_special_tokens=False),
         tokenizer=tokenizer,
     )
+    check_end_token_trained(tokenizer, collator, train_raw)
 
     # Plan 4d (Kaggle T4x2): effective batch 8, 600 steps is about 2.8 epochs of 1,737 rows
     training_args = TrainingArguments(
