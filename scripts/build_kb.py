@@ -4,7 +4,8 @@ Build the rule-lookup knowledge file from the reviewed training data.
     python scripts/build_kb.py                      # data/v2_training/raw.jsonl -> data/knowledge/kb.jsonl
 
 Refusal rows are left out (they hold no facts). Rows held for CA review are not in raw.jsonl, so they
-stay out too. Questions that also appear in the eval files are left out, so the eval stays a fair test.
+stay out too. Rows in data/knowledge_extra/checklist_notes.jsonl (facts from Tejas's checklist that the training data lacks) are added.
+Questions that also appear in the eval files are left out, so the eval stays a fair test.
 """
 
 import json
@@ -15,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "data/v2_training/raw.jsonl"
 OUT = ROOT / "data/knowledge/kb.jsonl"
+EXTRA = ROOT / "data/knowledge_extra/checklist_notes.jsonl"   # facts from FACTS_TO_VERIFY.md that the training data lacks
 EVAL_FILES = [ROOT / "eval/golden_set.jsonl", ROOT / "eval/hindi_eval_30.jsonl", ROOT / "eval/multiturn_eval_20.jsonl"]
 
 
@@ -44,6 +46,8 @@ def eval_questions() -> set[str]:
 
 def main() -> int:
     rows = [r for r in load(SRC) if r.get("domain") != "REFUSAL" and r.get("prompt") and r.get("completion")]
+    if EXTRA.exists():
+        rows += [r for r in load(EXTRA) if r.get("prompt") and r.get("completion")]
     eval_qs = eval_questions()
     leaked = [r for r in rows if norm(r["prompt"]) in eval_qs]
     rows = [r for r in rows if norm(r["prompt"]) not in eval_qs]
