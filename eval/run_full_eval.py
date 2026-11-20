@@ -93,6 +93,11 @@ class Responder:
     def __init__(self, args):
         self.mode = "selftest" if args.self_test else ("responses" if args.responses else "model")
         self.max_new_tokens = args.max_new_tokens
+        self.rag_k = getattr(args, "rag", 0)
+        self.retriever = None
+        if self.rag_k:
+            from guardrails.retrieval import load_retriever
+            self.retriever = load_retriever()
         self.pre = {}
         if self.mode == "responses":
             for row in load_jsonl(Path(args.responses)):
@@ -115,7 +120,11 @@ class Responder:
             return reference
         if self.mode == "responses":
             return self.pre.get(key, "")
-        messages = [{"role": "system", "content": self.system}] + history + [{"role": "user", "content": question}]
+        asked = question
+        if self.retriever:
+            from guardrails.retrieval import with_notes
+            asked = with_notes(question, self.retriever.search(question, k=self.rag_k))
+        messages = [{"role": "system", "content": self.system}] + history + [{"role": "user", "content": asked}]
         # enable_thinking=False: same as training and the server, and fair to Qwen3 in a comparison.
         # Qwen2.5's template ignores the flag.
         ids = self.tok.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt",
@@ -188,6 +197,7 @@ def main():
     ap.add_argument("--self-test", action="store_true", help="answer every item with its own reference")
     ap.add_argument("--tag", default="", help="label for this run, e.g. baseline or v1")
     ap.add_argument("--max-new-tokens", type=int, default=300)
+    ap.add_argument("--rag", type=int, default=0, help="put the K most relevant reviewed notes in front of each question")
     args = ap.parse_args()
     if not (args.self_test or args.responses or args.model_id):
         ap.error("give --model-id, --responses or --self-test")
