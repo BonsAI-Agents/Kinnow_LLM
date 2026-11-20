@@ -3,7 +3,7 @@ Build the rule-lookup knowledge file from the reviewed training data.
 
     python scripts/build_kb.py                      # data/v2_training/raw.jsonl -> data/knowledge/kb.jsonl
 
-Refusal rows are left out (they hold no facts). Rows held for CA review are not in raw.jsonl, so they
+Refusal rows and the generated calculation rows are left out (no facts to look up). Rows held for CA review are not in raw.jsonl, so they
 stay out too. Rows in data/knowledge_extra/checklist_notes.jsonl (facts from Tejas's checklist that the training data lacks) are added.
 Questions that also appear in the eval files are left out, so the eval stays a fair test.
 """
@@ -18,6 +18,10 @@ SRC = ROOT / "data/v2_training/raw.jsonl"
 OUT = ROOT / "data/knowledge/kb.jsonl"
 EXTRA = ROOT / "data/knowledge_extra/checklist_notes.jsonl"   # facts from FACTS_TO_VERIFY.md that the training data lacks
 EVAL_FILES = [ROOT / "eval/golden_set.jsonl", ROOT / "eval/hindi_eval_30.jsonl", ROOT / "eval/multiturn_eval_20.jsonl"]
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from generate_calc_rows import generate as generate_calc_rows  # noqa: E402
 
 
 def norm(s: str) -> str:
@@ -48,6 +52,10 @@ def main() -> int:
     rows = [r for r in load(SRC) if r.get("domain") != "REFUSAL" and r.get("prompt") and r.get("completion")]
     if EXTRA.exists():
         rows += [r for r in load(EXTRA) if r.get("prompt") and r.get("completion")]
+    # Generated calculation rows are for training only. As notes they crowd out the fact notes: a question
+    # about the composition limit then retrieves worked composition examples instead of the limit itself.
+    generated = {norm(g["prompt"]) for g in generate_calc_rows(42)}
+    rows = [r for r in rows if norm(r["prompt"]) not in generated]
     eval_qs = eval_questions()
     leaked = [r for r in rows if norm(r["prompt"]) in eval_qs]
     rows = [r for r in rows if norm(r["prompt"]) not in eval_qs]

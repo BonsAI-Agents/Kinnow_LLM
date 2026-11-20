@@ -17,8 +17,12 @@ Usage:
 
 import json
 import re
+import sys
 from collections import Counter
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from generate_calc_rows import generate as generate_calc_rows  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 TEJAS = ROOT / "data" / "tejas" / "kinnow_sft_500.jsonl"
@@ -37,9 +41,14 @@ OLD_REGIME = {
 
 
 # Rows held out of training until a CA confirms them (data/tejas_review/VERIFICATION_REPORT.md).
-# Section 50(3): sources disagree on whether the rate is still 24%.
-HOLD = {
-    "Section 50(3) interest rate (unconfirmed)":
+# Empty now: the Section 50(3) rows moved to ASSUMED_CONFIRMED below.
+HOLD: dict[str, str] = {}
+
+# Rows used in training on the owner's decision (20 Nov 2026) although no CA has confirmed them yet.
+# Section 50(3): 24% a year on ITC wrongly availed and utilised (Rule 88B), 18% under Section 50(1).
+# They are listed in assumed_pending_ca.jsonl so a CA can check them later; fix and retrain if one disagrees.
+ASSUMED_CONFIRMED = {
+    "Section 50(3) interest rate (assumed confirmed, CA pending)":
         r"(?i)50\(3\)|\b24% (p\.a\.?|per annum|a year|interest)|interest at 24%|24% interest",
 }
 
@@ -71,7 +80,11 @@ def old_regime_reasons(row: dict) -> list[str]:
 
 def main():
     tejas, v1 = load(TEJAS), load(V1)
-    held = []
+    held, assumed = [], []
+
+    def assumed_reasons(row: dict) -> list[str]:
+        text = row["prompt"] + " " + row["completion"]
+        return [name for name, pat in ASSUMED_CONFIRMED.items() if re.search(pat, text)]
 
     def hold_reasons(row: dict) -> list[str]:
         text = row["prompt"] + " " + row["completion"]
@@ -87,6 +100,8 @@ def main():
         if reasons:
             held.append({**r, "reason": reasons, "source": "tejas"})
         else:
+            if assumed_reasons(r):
+                assumed.append({**r, "reason": assumed_reasons(r), "source": "tejas"})
             kept_tejas.append(r)
     tejas_rows_in = len(tejas)
     tejas = kept_tejas
@@ -105,9 +120,15 @@ def main():
             dropped.append({**r, "reason": reasons})
             continue
         seen.add(norm(r["prompt"]))
+        if assumed_reasons(r):
+            assumed.append({**r, "reason": assumed_reasons(r), "source": "v1"})
         kept.append(r)
 
-    merged = tejas + kept
+    # Calculation rows computed by scripts/generate_calc_rows.py (fixed seed, so every build gives the same rows)
+    seen_prompts = {norm(r["prompt"]) for r in tejas + kept}
+    generated = [{"domain": g["domain"], "prompt": g["prompt"], "completion": g["completion"]}
+                 for g in generate_calc_rows(42) if norm(g["prompt"]) not in seen_prompts]
+    merged = tejas + kept + generated
     OUT.mkdir(parents=True, exist_ok=True)
     with open(OUT / "raw.jsonl", "w", encoding="utf-8", newline="\n") as f:
         for r in merged:
@@ -120,15 +141,21 @@ def main():
         for r in held:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
+    with open(OUT / "assumed_pending_ca.jsonl", "w", encoding="utf-8", newline="\n") as f:
+        for r in assumed:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
     manifest = {
         "tejas_rows_received": tejas_rows_in,
         "tejas_rows": len(tejas),
         "tejas_rows_rewritten": rewritten,
         "rows_held_for_verification": len(held),
+        "rows_assumed_confirmed_pending_ca": len(assumed),
         "held_by_source": dict(Counter(r["source"] for r in held)),
         "v1_rows_kept": len(kept),
         "v1_rows_dropped_old_regime": len(dropped),
         "v1_rows_dropped_same_prompt_as_tejas": dup,
+        "generated_calc_rows": len(generated),
         "total": len(merged),
         "domains": dict(Counter(r["domain"] for r in merged)),
         "dropped_by_domain": dict(Counter(r["domain"] for r in dropped)),
