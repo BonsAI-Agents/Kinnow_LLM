@@ -364,15 +364,16 @@ def i_interest18(rng):
     return "INVOICE", q, a
 
 
-def i_interest24(rng):
+def i_interest503(rng):
+    # Section 50(3) rate: 18% (Notification 14/2022-CT per Tejas, 21 Nov 2026; owner's decision, CA still to confirm)
     t = rng.randrange(10_000, 1_000_001, 1_000)
     d = rng.randint(5, 200)
     q = rng.choice([
         f"ITC of {inr(t)} was wrongly availed and utilised, then reversed after {d} days. Interest payable?",
         f"We claimed and used ITC of {inr(t)} that was not eligible and reversed it {d} days later. What is the interest?",
     ])
-    a = (f"Section 50(3) charges 24% a year on ITC wrongly availed and utilised, from the date of utilisation to the date of reversal "
-         f"(Rule 88B). {inr(t)} x 24% x {d}/365 = {inr(interest(t, 24, d))}.")
+    a = (f"Section 50(3) charges 18% a year on ITC wrongly availed and utilised, from the date of utilisation to the date of reversal "
+         f"(Rule 88B). {inr(t)} x 18% x {d}/365 = {inr(interest(t, 18, d))}.")
     return "INVOICE", q, a
 
 
@@ -465,7 +466,7 @@ PLAN = [
     (p_gratuity, 22), (p_gratuity_fixed, 8), (p_epf, 18), (p_esi, 16), (p_tds_new, 28), (p_leave, 12),
     (p_partial, 14), (p_bonus, 8), (p_pf_hi, 8), (p_esi_hi, 8), (p_gratuity_hi, 8),
     (i_invoice, 32), (i_inclusive, 16), (i_credit_note, 16), (i_cn_deadline, 6), (i_interest18, 16),
-    (i_interest24, 10), (i_rule37, 12), (i_rule42, 12), (i_einv_threshold, 10), (i_einv_30day, 10),
+    (i_interest503, 10), (i_rule37, 12), (i_rule42, 12), (i_einv_threshold, 10), (i_einv_30day, 10),
     (i_gst_tds, 10), (g_composition, 12),
 ]
 

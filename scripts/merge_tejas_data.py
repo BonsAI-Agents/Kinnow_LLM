@@ -25,7 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from generate_calc_rows import generate as generate_calc_rows  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-TEJAS = ROOT / "data" / "tejas" / "kinnow_sft_500.jsonl"
+TEJAS_FILES = [ROOT / "data" / "tejas" / "kinnow_sft_500_v2.jsonl",             # 500 rows, Section 50(3) fixed to 18% (21 Nov 2026)
+               ROOT / "data" / "tejas" / "kinnow_sft_payroll_invoice_v2.jsonl"]  # 89 worked examples and traps
 V1 = ROOT / "data" / "v1_training" / "raw.jsonl"
 OUT = ROOT / "data" / "v2_training"
 
@@ -41,15 +42,20 @@ OLD_REGIME = {
 
 
 # Rows held out of training until a CA confirms them (data/tejas_review/VERIFICATION_REPORT.md).
-# Empty now: the Section 50(3) rows moved to ASSUMED_CONFIRMED below.
+# Applies to our own v1 rows only: they state 24% for Section 50(3), which the owner replaced with Tejas's 18%
+# (21 Nov 2026). They are listed in held_for_verification.jsonl so a CA can rewrite and re-add them.
+V1_HOLD: dict[str, str] = {
+    "v1 row states 24% for Section 50(3) (owner chose 18%)":
+        r'(?i)50\(3\)|24% (p\.a\.?|per annum|a year|interest)|interest at 24%|24% interest|24% (p\.a|per annum) ?(for|on)|24% वार्षिक',
+}
 HOLD: dict[str, str] = {}
 
-# Rows used in training on the owner's decision (20 Nov 2026) although no CA has confirmed them yet.
-# Section 50(3): 24% a year on ITC wrongly availed and utilised (Rule 88B), 18% under Section 50(1).
+# Rows used in training on the owner's decision (21 Nov 2026) although no CA has confirmed them yet.
+# Section 50(3): 18% a year on ITC wrongly availed and utilised (Notification 14/2022-CT per Tejas; the Act's 24% is the ceiling).
 # They are listed in assumed_pending_ca.jsonl so a CA can check them later; fix and retrain if one disagrees.
 ASSUMED_CONFIRMED = {
-    "Section 50(3) interest rate (assumed confirmed, CA pending)":
-        r"(?i)50\(3\)|\b24% (p\.a\.?|per annum|a year|interest)|interest at 24%|24% interest",
+    "Section 50(3) interest rate 18% (assumed confirmed, CA pending)":
+        r'(?i)50\(3\)',
 }
 
 # Tejas rows rewritten because the law moved on: prompt -> new completion.
@@ -79,7 +85,8 @@ def old_regime_reasons(row: dict) -> list[str]:
 
 
 def main():
-    tejas, v1 = load(TEJAS), load(V1)
+    tejas = [r for f in TEJAS_FILES for r in load(f)]
+    v1 = load(V1)
     held, assumed = [], []
 
     def assumed_reasons(row: dict) -> list[str]:
@@ -107,8 +114,9 @@ def main():
     tejas = kept_tejas
     seen = {norm(r["prompt"]) for r in tejas}
     kept, dropped, dup = [], [], 0
+    v1_hold = {**HOLD, **V1_HOLD}
     for r in v1:
-        reasons = hold_reasons(r)
+        reasons = [name for name, pat in v1_hold.items() if re.search(pat, r["prompt"] + " " + r["completion"])]
         if reasons:
             held.append({**r, "reason": reasons, "source": "v1"})
             continue
