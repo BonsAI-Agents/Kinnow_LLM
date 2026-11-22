@@ -12,7 +12,7 @@ Rules come from Tejas's reviewed checklist (data/tejas_review/FACTS_TO_VERIFY*.m
   gratuity 15/26 x last drawn wages x completed years (6+ months rounds up), cap Rs 20 lakh
   EPF 12% on wages up to the Rs 25,000 ceiling; ESI 0.75% / 3.25% on gross wages up to Rs 21,000, rounded up
   new regime: Rs 75,000 standard deduction, slabs to 30%, rebate to Rs 12 lakh with marginal relief, 4% cess
-  interest: 18% a year (Section 50(1); Section 50(3) too, on the owner's decision, CA to confirm)
+  interest: 18% a year (Section 50(1) and Section 50(3); the 50(3) rate is CA-approved, per the owner, 22 Nov 2026)
 """
 
 import re

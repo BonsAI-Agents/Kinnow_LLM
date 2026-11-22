@@ -2,7 +2,7 @@
 Generate Invoice and Payroll calculation rows for training and the notes file.
 
 Every number in an answer is computed by the functions below, so the arithmetic cannot be wrong; the
-rules come from Tejas's FACTS_TO_VERIFY.md (and the Section 50(3) point the owner assumed confirmed).
+rules come from Tejas's FACTS_TO_VERIFY.md (and the Section 50(3) rate of 18%, CA-approved per the owner, 22 Nov 2026).
 No new section numbers or forms are invented here. Rules that are not in the checklist and not settled
 law are left out (Maharashtra professional tax, EPS split, overtime).
 
@@ -365,7 +365,7 @@ def i_interest18(rng):
 
 
 def i_interest503(rng):
-    # Section 50(3) rate: 18% (Notification 14/2022-CT per Tejas, 21 Nov 2026; owner's decision, CA still to confirm)
+    # Section 50(3) rate: 18% (Notification 14/2022-CT per Tejas, 21 Nov 2026; CA-approved per the owner, 22 Nov 2026)
     t = rng.randrange(10_000, 1_000_001, 1_000)
     d = rng.randint(5, 200)
     q = rng.choice([

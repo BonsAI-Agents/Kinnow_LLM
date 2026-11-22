@@ -50,13 +50,11 @@ V1_HOLD: dict[str, str] = {
 }
 HOLD: dict[str, str] = {}
 
-# Rows used in training on the owner's decision (21 Nov 2026) although no CA has confirmed them yet.
-# Section 50(3): 18% a year on ITC wrongly availed and utilised (Notification 14/2022-CT per Tejas; the Act's 24% is the ceiling).
-# They are listed in assumed_pending_ca.jsonl so a CA can check them later; fix and retrain if one disagrees.
-ASSUMED_CONFIRMED = {
-    "Section 50(3) interest rate 18% (assumed confirmed, CA pending)":
-        r'(?i)50\(3\)',
-}
+# Rows used in training before a CA has confirmed them, listed in assumed_pending_ca.jsonl so a CA can check them
+# later. Empty now: Section 50(3) interest at 18% a year on ITC wrongly availed and utilised (Notification 14/2022-CT
+# per Tejas; the Act's 24% is the ceiling) was chosen by the owner on 21 Nov 2026 and, per the owner, approved by
+# the CA on 22 Nov 2026 (see data/tejas_review/DECISIONS.md). Add a pattern here for any new unconfirmed point.
+ASSUMED_CONFIRMED: dict[str, str] = {}
 
 # Tejas rows rewritten because the law moved on: prompt -> new completion.
 # Meal vouchers: Income-tax Rules 2026 (Rule 15(5)(a)) raised Rs 50 to Rs 200 per meal from tax year 2026-27.
