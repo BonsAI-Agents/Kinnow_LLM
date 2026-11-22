@@ -264,6 +264,30 @@ def main():
     print("\nStarting SFT training…")
     trainer.train()
 
+    # Write down exactly what was used, next to the adapter, so a score can always be traced to its settings
+    # (the Kaggle job scripts copy this into the run record). A failure here must never block the upload below.
+    try:
+        settings = {
+            "base_model": BASE_MODEL, "hf_repo": HF_REPO, "precision": "bf16" if use_bf16 else "fp16",
+            "seed": training_args.seed, "max_steps": training_args.max_steps,
+            "learning_rate": training_args.learning_rate, "lr_scheduler": "cosine",
+            "warmup_steps": training_args.warmup_steps, "optimizer": training_args.optim,
+            "per_device_batch": training_args.per_device_train_batch_size,
+            "gradient_accumulation": training_args.gradient_accumulation_steps,
+            "max_seq_length": MAX_SEQ_LENGTH,
+            "lora": {"r": lora_config.r, "alpha": lora_config.lora_alpha, "dropout": lora_config.lora_dropout,
+                     "target_modules": sorted(lora_config.target_modules)},
+            "train_rows": len(train_raw), "val_rows": len(val_raw),
+            "eval_loss_history": [[h["step"], round(h["eval_loss"], 4)]
+                                  for h in trainer.state.log_history if "eval_loss" in h],
+            "best_eval_loss": trainer.state.best_metric,
+        }
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        with open(os.path.join(OUTPUT_DIR, "run_settings.json"), "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=1)
+    except Exception as e:      # noqa: BLE001
+        print("could not write run_settings.json:", e)
+
     print(f"\nSaving adapter to {OUTPUT_DIR}")
     trainer.save_model(OUTPUT_DIR)
     tokenizer.save_pretrained(OUTPUT_DIR)
