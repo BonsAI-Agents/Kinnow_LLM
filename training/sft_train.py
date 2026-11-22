@@ -12,6 +12,8 @@ Env vars:
     HF_TOKEN   — HuggingFace write token (only for the final push)
     HF_REPO    — e.g. KaraPatelDev/kinnow-v1
     MAX_STEPS  — override the 600 steps (plan 4d: 800 for 3000+ examples)
+    SEED       — random seed (default 42, the Hugging Face default). Train twice with different seeds to see
+                 how much a score moves on its own before trusting a small difference between versions.
 """
 
 import json
@@ -219,6 +221,7 @@ def main():
     training_args = TrainingArguments(
         output_dir=OUTPUT_DIR,
         max_steps=int(os.getenv("MAX_STEPS", "600")),
+        seed=int(os.getenv("SEED", "42")),
         per_device_train_batch_size=2,
         # The default eval batch size is 8. On a T4 the logits of 8 long sequences (vocab 152k) need
         # more than 3 GiB and crashed the first evaluation (step 100) with CUDA OOM, before any checkpoint.

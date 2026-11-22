@@ -6,8 +6,9 @@ Startup sequence:
   2. Connect vLLM client
   3. Set up the per-user request rate limiter
   4. Load domain centroids from data/centroids.npz and warm the embedding model
-  5. Initialize guardrail pipeline
-  6. Register routes
+  5. Load the answer support (reference-note lookup, calculators, sources line; all optional)
+  6. Initialize guardrail pipeline
+  7. Register routes
 
 Run locally:
     uvicorn serve.app:app --host 0.0.0.0 --port 8000 --workers 1
@@ -33,6 +34,7 @@ from serve.routes.health import router as health_router
 from serve.routes.feedback import router as feedback_router
 from serve.circuit_breaker import get_circuit_breaker
 from guardrails.pipeline import KinnowGuardrailPipeline
+from guardrails.answer_support import AnswerSupport
 from guardrails.layer2_classifier import set_domain_centroids, load_centroids, load_embedding_model
 
 
@@ -75,8 +77,14 @@ async def lifespan(app: FastAPI):
     async def model_fn(messages):
         return await cb.call(generate(messages))
 
+    # Reference notes, calculators and the sources line (guardrails/answer_support.py). Loading the lookup can
+    # take a few seconds (embedding model, note embeddings), so it happens here and not on a request.
+    support = await asyncio.to_thread(AnswerSupport.from_env)
+    print(f"  ✓ Answer support: {support.describe()}" if support else "  ⚠ Answer support off (no knowledge file, calculators disabled)")
+
     # Off-topic rate-limit state lives in Redis so every replica enforces the same limit.
-    pipeline = KinnowGuardrailPipeline(model_fn=model_fn, rate_limiter=RedisRateLimiter(get_redis))
+    pipeline = KinnowGuardrailPipeline(model_fn=model_fn, rate_limiter=RedisRateLimiter(get_redis),
+                                       answer_support=support)
     set_pipeline(pipeline)
     print("  ✓ Guardrail pipeline initialized")
     print("  → Server ready\n")

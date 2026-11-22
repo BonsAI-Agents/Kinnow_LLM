@@ -31,7 +31,10 @@ Kinnow_LLM/
 │   ├── layer2_classifier.py        keyword → embedding input classifier
 │   ├── layer3_output_validator.py  PII / GST rate / out-of-scope output checks
 │   ├── layer4_injection.py         prompt injection detection + sanitisation
-│   └── pipeline.py                 orchestration + refusal anomaly tracker
+│   ├── pipeline.py                 orchestration + refusal anomaly tracker
+│   ├── answer_support.py           reference notes, calculators and Sources line around the model (optional)
+│   ├── retrieval.py                the rule lookup: word matching, hybrid matching, Sources line
+│   └── calculators.py              gratuity, PF, ESI, new-regime tax and interest worked in code
 ├── serve/             FastAPI serving layer
 │   ├── app.py                     application + lifespan (Redis, vLLM, centroids)
 │   ├── routes/chat.py             POST /v1/chat
@@ -64,6 +67,27 @@ Kinnow_LLM/
 ├── .github/           CI, eval gate, deploy pipelines, Dependabot
 └── CHECKLIST.md       phase-by-phase delivery status and go-live sign-off
 ```
+
+---
+
+## Answer support (lookup, calculators, sources)
+
+Around the model call, `guardrails/answer_support.py` does three optional things. On the eval they moved the v4
+model from 50.0% to 57.8% overall (see `notebooks/kinnow_kaggle_runbook.ipynb`, section 7):
+
+1. **Lookup.** The 4 most relevant reviewed Q&A notes are put in front of the question.
+2. **Calculators.** For a plain calculation question the server works out the figure and gives it to the model.
+3. **Sources line.** After the answer, a line such as `Sources: Section 16(2)(aa), Rule 37`, taken only from the notes shown.
+
+Set it up once per knowledge update:
+
+```bash
+python scripts/merge_tejas_data.py && python scripts/build_kb.py --embed   # writes data/knowledge/kb.jsonl and its embeddings
+```
+
+Mount the `data/knowledge/` folder next to `data/centroids.npz` (read-only is fine once the embeddings are cached).
+Every step falls back to the plain question or answer on any error, and the server runs without the knowledge file.
+The sources line is only added to answers that are not refusals, after the output validator has checked the model's own text.
 
 ---
 
@@ -214,6 +238,11 @@ the item-by-item status.
 | `API_KEY_NEW` | no | Second accepted key while rotating keys |
 | `CENTROIDS_PATH` | no | Domain centroid archive (default `data/centroids.npz`; built by `scripts/build_centroids.py`) |
 | `MODEL_NAME` | no | Model name sent to vLLM (default `kinnow-v1`) |
+| `KINNOW_LOOKUP` | no | How reference notes are found: `hybrid` (default, word + embedding matching), `bm25` (word matching only) or `off` |
+| `KINNOW_KB_PATH` | no | Knowledge file for the lookup (default `data/knowledge/kb.jsonl`; built by `scripts/build_kb.py --embed`). Without it the server runs without the lookup |
+| `KINNOW_LOOKUP_K` | no | Notes shown per question (default 4; 6 scored lower in testing) |
+| `KINNOW_CALC` | no | `1` (default) / `0`: calculators for plain gratuity, PF, ESI, new-regime tax and interest questions |
+| `KINNOW_SOURCES` | no | `1` (default) / `0`: add a "Sources: Section ..., Rule ..." line taken from the notes shown to the model |
 | `ENV` | no | `development` / `staging` / `production` |
 | `LOG_LEVEL` | no | Log verbosity |
 | `HF_TOKEN` | training only | HuggingFace read/write token |

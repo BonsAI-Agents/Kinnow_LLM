@@ -93,7 +93,10 @@ class HybridRetriever(Retriever):
         else:
             self.emb = self.model.encode(docs, batch_size=64, normalize_embeddings=True, show_progress_bar=False)
             if cache:
-                np.save(cache, self.emb)
+                try:
+                    np.save(cache, self.emb)
+                except OSError:      # read-only data mount: keep the embeddings in memory only
+                    pass
         self._pos = {id(r): i for i, r in enumerate(rows)}
 
     def search(self, query: str, k: int = 3, min_score: float = 0.0) -> list[dict]:

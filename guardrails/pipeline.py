@@ -7,6 +7,7 @@ Execution order:
 Refusal anomaly tracker (Section 21f): rate-limits users who repeatedly probe OOS topics.
 """
 
+import asyncio
 import hashlib
 
 from .layer4_injection import sanitize_input, detect_injection
@@ -67,11 +68,16 @@ class KinnowGuardrailPipeline:
     """
     Stateless pipeline class. Instantiate once at app startup.
     Pass a `model_fn` callable: fn(messages: list[dict]) -> str
+
+    `answer_support` (guardrails.answer_support.AnswerSupport, optional) adds reference notes and calculated
+    figures in front of the question and a "Sources:" line after the answer. Without it the pipeline behaves
+    exactly as before.
     """
 
-    def __init__(self, model_fn, rate_limiter=None):
+    def __init__(self, model_fn, rate_limiter=None, answer_support=None):
         self.model_fn = model_fn
         self._limiter = rate_limiter or _default_limiter
+        self.answer_support = answer_support
 
     async def process(self, query: str, history: list[dict], user_id: str = 'anonymous') -> dict:
         """
@@ -115,7 +121,11 @@ class KinnowGuardrailPipeline:
 
         # --- Layer 1: Build messages with sanitized history + system prompt ---
         clean_history = sanitize_history(history)
-        messages = build_messages(query, clean_history)
+        asked, hits = query, []
+        if self.answer_support is not None:
+            # notes + computed figures in front of the question (runs off the event loop: embedding search)
+            asked, hits = await asyncio.to_thread(self.answer_support.prepare, query)
+        messages = build_messages(asked, clean_history)
 
         # --- Model inference ---
         try:
@@ -128,7 +138,7 @@ class KinnowGuardrailPipeline:
             self._log_event('model_error', {'user_hash': anonymise(user_id), 'error': str(e)})
             return self._blocked_response(OUTPUT_INVALID_RESPONSE, 'model_error')
 
-        # --- Layer 3: Output validation ---
+        # --- Layer 3: Output validation (on the model's own text) ---
         validation = validate_output_v2(raw_output)
         if not validation['valid']:
             self._log_event('output_invalid', {
@@ -146,9 +156,16 @@ class KinnowGuardrailPipeline:
                 # Return response but append a caveat
                 caveat = ("\n\n*Note: Please verify GST rates with the official GSTN portal "
                           "or a Chartered Accountant before filing.*")
-                return self._success_response(raw_output + caveat, messages, category, flags=['gst_rate_caveat'])
+                return self._success_response(self._finish(raw_output, hits) + caveat, messages, category,
+                                              flags=['gst_rate_caveat'])
 
-        return self._success_response(raw_output, messages, category)
+        return self._success_response(self._finish(raw_output, hits), messages, category)
+
+    def _finish(self, text: str, hits: list[dict]) -> str:
+        """Add the Sources line to a valid answer (only when answer support is on)."""
+        if self.answer_support is None:
+            return text
+        return self.answer_support.finish(text, hits)
 
     # --- Response builders ---
 

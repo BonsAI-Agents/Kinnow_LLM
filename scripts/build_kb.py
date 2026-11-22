@@ -2,6 +2,9 @@
 Build the rule-lookup knowledge file from the reviewed training data.
 
     python scripts/build_kb.py                      # data/v2_training/raw.jsonl -> data/knowledge/kb.jsonl
+    python scripts/build_kb.py --embed              # also precompute the note embeddings the hybrid lookup uses
+                                                    # (about 4 minutes on CPU; the server then starts fast and the
+                                                    # data folder can be mounted read-only)
 
 Refusal rows and the generated calculation rows are left out (no facts to look up). Rows held for CA review are not in raw.jsonl, so they
 stay out too. Rows in data/knowledge_extra/checklist_notes.jsonl (facts from Tejas's checklist that the training data lacks) are added.
@@ -72,6 +75,11 @@ def main() -> int:
         for r in kept:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
     print(f"{len(kept)} notes written to {OUT.relative_to(ROOT)}")
+    if "--embed" in sys.argv:
+        sys.path.insert(0, str(ROOT))
+        from guardrails.retrieval import HybridRetriever
+        HybridRetriever(kept, cache_path=OUT)          # writes data/knowledge/kb.jsonl.<key>.npy
+        print("note embeddings cached next to the knowledge file")
     return 0
 
 

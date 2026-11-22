@@ -1,6 +1,14 @@
 """Shared fixtures for the unit and integration tests."""
 
+import os
+
 import pytest
+
+# The answer support (lookup, calculators, sources line) is optional and loads a model when a knowledge file
+# exists in data/. Tests must not depend on whatever data folder the machine has, so it is off unless a test
+# builds it explicitly (tests/unit/test_answer_support.py passes its own settings).
+os.environ.setdefault("KINNOW_LOOKUP", "off")
+os.environ.setdefault("KINNOW_CALC", "0")
 
 from guardrails.pipeline import reset_oos_tracker
 from guardrails import layer2_classifier
