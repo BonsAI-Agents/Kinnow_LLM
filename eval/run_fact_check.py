@@ -46,6 +46,9 @@ def main() -> int:
     ap.add_argument("--model-id")
     ap.add_argument("--adapter")
     ap.add_argument("--rag", type=int, default=0)
+    ap.add_argument("--hybrid", action="store_true")
+    ap.add_argument("--calc", action="store_true")
+    ap.add_argument("--cite", action="store_true")
     ap.add_argument("--max-new-tokens", type=int, default=200)
     ap.add_argument("--self-test", action="store_true")
     ap.add_argument("--notes-only", action="store_true", help="only check the retrieved notes, no model")
@@ -57,13 +60,13 @@ def main() -> int:
     k = args.rag or 4
 
     from guardrails.retrieval import load_retriever
-    retriever = load_retriever() if (args.notes_only or args.rag) else None
+    retriever = load_retriever(hybrid=args.hybrid) if (args.notes_only or args.rag) else None
 
     responder = None
     if not args.notes_only:
         responder = Responder(SimpleNamespace(self_test=args.self_test, responses=None, model_id=args.model_id,
                                               adapter=args.adapter, max_new_tokens=args.max_new_tokens,
-                                              rag=args.rag))
+                                              rag=args.rag, hybrid=args.hybrid, calc=args.calc, cite=args.cite))
 
     rows = []
     for c in claims:

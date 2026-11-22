@@ -34,3 +34,15 @@ def test_nothing_found_returns_empty_and_question_is_unchanged():
 def test_with_notes_puts_the_question_last():
     out = with_notes("What is the due date?", Retriever(ROWS).search("CMP-08 due", k=1))
     assert out.endswith("Question: What is the due date?") and "CMP-08" in out
+
+
+def test_hybrid_retriever_finds_a_paraphrase_that_word_matching_misses(tmp_path):
+    import pytest
+    pytest.importorskip("sentence_transformers")
+    from guardrails.retrieval import HybridRetriever
+    rows = ROWS + [{"domain": "GST", "prompt": "Vendor has not been paid for 200 days. What happens to our ITC?",
+                    "completion": "Rule 37 requires reversal of the ITC with interest."}]
+    r = HybridRetriever(rows, cache_path=tmp_path / "emb")
+    hits = r.search("unpaid supplier for more than 180 days, input credit?", k=1)
+    assert hits and "Rule 37" in hits[0]["completion"]
+    assert list(tmp_path.glob("emb.*.npy"))           # embeddings were cached for the next start

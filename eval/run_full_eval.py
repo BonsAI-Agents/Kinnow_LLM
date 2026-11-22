@@ -94,10 +94,12 @@ class Responder:
         self.mode = "selftest" if args.self_test else ("responses" if args.responses else "model")
         self.max_new_tokens = args.max_new_tokens
         self.rag_k = getattr(args, "rag", 0)
+        self.calc = getattr(args, "calc", False)
+        self.cite = getattr(args, "cite", False)
         self.retriever = None
         if self.rag_k:
             from guardrails.retrieval import load_retriever
-            self.retriever = load_retriever()
+            self.retriever = load_retriever(hybrid=getattr(args, "hybrid", False))
         self.pre = {}
         if self.mode == "responses":
             for row in load_jsonl(Path(args.responses)):
@@ -120,10 +122,15 @@ class Responder:
             return reference
         if self.mode == "responses":
             return self.pre.get(key, "")
-        asked = question
+        asked, hits = question, []
         if self.retriever:
             from guardrails.retrieval import with_notes
-            asked = with_notes(question, self.retriever.search(question, k=self.rag_k))
+            hits = self.retriever.search(question, k=self.rag_k)
+            computed = None
+            if self.calc:
+                from guardrails.calculators import computed_hint
+                computed = computed_hint(question)
+            asked = with_notes(question, hits, computed)
         messages = [{"role": "system", "content": self.system}] + history + [{"role": "user", "content": asked}]
         # enable_thinking=False: same as training and the server, and fair to Qwen3 in a comparison.
         # Qwen2.5's template ignores the flag.
@@ -133,7 +140,14 @@ class Responder:
         with self.torch.no_grad():
             out = self.model.generate(**ids, max_new_tokens=self.max_new_tokens, do_sample=False)
         text = self.tok.decode(out[0][ids["input_ids"].shape[-1]:], skip_special_tokens=True)
-        return re.sub(r"^\s*<think>.*?</think>\s*", "", text, flags=re.DOTALL)   # drop a stray think block
+        text = re.sub(r"^\s*<think>.*?</think>\s*", "", text, flags=re.DOTALL)   # drop a stray think block
+        self.last_plain = text
+        if self.cite and hits:
+            from guardrails.retrieval import sources_line
+            line = sources_line(hits)
+            if line:
+                text = text.rstrip() + "\n" + line
+        return text
 
 
 def run_single(resp: Responder, items: list) -> list:
@@ -143,7 +157,12 @@ def run_single(resp: Responder, items: list) -> list:
         text = resp.respond(ex["question"], [], ex["question"], ex["reference"])
         ms = (time.time() - t0) * 1000
         r = evaluate_example(text, ex["must_contain"], ex.get("must_not_contain"))
-        results.append({**ex, "response": text, "passed": r["passed"], "latency_ms": round(ms, 1)})
+        row = {**ex, "response": text, "passed": r["passed"], "latency_ms": round(ms, 1)}
+        if getattr(resp, "cite", False) and getattr(resp, "last_plain", None) is not None:
+            # score the same answer without the Sources line too, so its effect is measured, not assumed
+            rp = evaluate_example(resp.last_plain, ex["must_contain"], ex.get("must_not_contain"))
+            row.update(response_plain=resp.last_plain, passed_plain=rp["passed"])
+        results.append(row)
     return results
 
 
@@ -198,6 +217,9 @@ def main():
     ap.add_argument("--tag", default="", help="label for this run, e.g. baseline or v1")
     ap.add_argument("--max-new-tokens", type=int, default=300)
     ap.add_argument("--rag", type=int, default=0, help="put the K most relevant reviewed notes in front of each question")
+    ap.add_argument("--hybrid", action="store_true", help="with --rag: word matching plus embeddings for the lookup")
+    ap.add_argument("--calc", action="store_true", help="with --rag: give the model the system's computed figures for calculation questions")
+    ap.add_argument("--cite", action="store_true", help="with --rag: add a 'Sources:' line taken from the retrieved notes")
     args = ap.parse_args()
     if not (args.self_test or args.responses or args.model_id):
         ap.error("give --model-id, --responses or --self-test")
@@ -269,6 +291,10 @@ def main():
     for c in sorted(cats):
         t = TARGETS.get(c)
         print(f"  {c:<14} : {cats[c]}%" + (f"   (target {t}%)" if t else ""))
+    if gres and "passed_plain" in gres[0]:
+        plain = per_category([{**r, "passed": r["passed_plain"]} for r in gres])
+        plain_overall = pct(sum(r["passed_plain"] for r in gres), len(gres))
+        print(f"  WITHOUT the Sources line: overall {plain_overall}%  " + str(plain))
     print(f"  false refusals : {frr['frr_pct']}% ({frr['false_refusals']}/{frr['legit_total']})   (limit {MAX_FALSE_REFUSAL_PCT}%)")
     print(f"  hindi          : {h_overall}% (gap {gap}pp vs English)  " + str(hcats))
     print(f"  multi-turn     : {mres['conversations_pass_pct']}% of conversations, {mres['turns_pass_pct']}% of turns")
