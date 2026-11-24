@@ -34,7 +34,7 @@ Kinnow_LLM/
 │   ├── pipeline.py                 orchestration + refusal anomaly tracker
 │   ├── answer_support.py           reference notes, calculators and Sources line around the model (optional)
 │   ├── retrieval.py                the rule lookup: word matching, hybrid matching, Sources line
-│   └── calculators.py              gratuity, PF, ESI, new-regime tax and interest worked in code
+│   └── calculators.py              gratuity, PF, ESI, tax (new and old regime), interest, GSTR late fee, Rule 37 and HRA worked in code
 ├── serve/             FastAPI serving layer
 │   ├── app.py                     application + lifespan (Redis, vLLM, centroids)
 │   ├── routes/chat.py             POST /v1/chat
@@ -52,12 +52,16 @@ Kinnow_LLM/
 │   └── quantize_awq.py            AWQ 4-bit quantization
 ├── eval/              evaluation suites and gates
 │   ├── eval_guardrails.py         OOS block rate, ERP pass rate, latency
-│   └── eval_model.py              post-training model quality gate
+│   ├── eval_model.py              post-training model quality gate
+│   └── lenient.py                 second scorer: short forms count as their full names (never scores lower than the strict one)
 ├── scripts/           operational tooling
 │   ├── validate_data.py           dataset schema + quality validation
 │   ├── split_data.py              stratified 90/10 train/val split
 │   ├── build_centroids.py         embedding centroids for Layer 2
 │   ├── check_slos.py              canary SLO checker (Prometheus)
+│   ├── ingest_new_batches.py      checks new data batches (format, repeats, overlap with the test set, old 24% rate, "check" rows)
+│   ├── rescore.py                 re-scores saved answers with the strict and the lenient scorer, no model needed
+│   ├── run_record.py              run record written by the Kaggle jobs, and the side-by-side comparison table
 │   ├── export_feedback.py         drain the human review queue
 │   └── prepare_v2_data.py         merge reviewed feedback into v2 data
 ├── data/FORMAT.md     training data contract for contributors
