@@ -1,7 +1,7 @@
 """Check and clean the new data batches from Tejas before they are used for training.
 
 Usage:
-    python scripts/ingest_new_batches.py <folder with batch01_*.jsonl ... batch16_*.jsonl> [--keep-check]
+    python scripts/ingest_new_batches.py <folder with batch*.jsonl> [--keep-check] [--prior <folder of earlier batches>]...
 
 Reads the batch files (training rows in batches 1-14, knowledge notes in 15, glossary in 16) and writes, to data/tejas/new_v3/:
     sft_rows.jsonl      accepted training rows {domain, prompt, completion}
@@ -11,7 +11,8 @@ Reads the batch files (training rows in batches 1-14, knowledge notes in 15, glo
     report.json         counts per batch and per reason
 A row is rejected when: it is not valid JSON or lacks a field; it is marked confidence "check" (unless --keep-check);
 the answer is empty or very short; its prompt repeats an earlier prompt (in the batches or in the current training data);
-it is too close to a test question (so the score would be inflated); or it states the old 24% for Section 50(3).
+it is too close to a test question (so the score would be inflated); it is too close to a row in an earlier batch (--prior);
+or it states the old 24% for Section 50(3).
 """
 
 import json
@@ -25,6 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = Path(os.environ.get("KINNOW_INGEST_OUT", ROOT / "data" / "tejas" / "new_v3"))
 DOMAINS = {"GST", "PAYROLL", "INVOICE", "REFUSAL"}
 OVERLAP = 0.5            # share of words in common (shared / all distinct words) above which a row counts as a copy of a test question
+PRIOR_OVERLAP = 0.6           # share of words in common with a prompt from an earlier batch above which a row counts as a repeat
 OVERLAP_WITH_NUMBERS = 0.35   # lower bar when the row also repeats two or more of the test question's figures
 
 
@@ -83,10 +85,25 @@ def existing_prompts() -> set:
     return seen
 
 
+def prior_prompts(folders: list) -> list:
+    """Word sets of every prompt in the earlier batches (batch*.jsonl, and the rows files this script writes)."""
+    out = []
+    for folder in folders:
+        for path in Path(folder).glob("*.jsonl"):
+            for line in load_jsonl(path):
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(d.get("prompt"), str):
+                    out.append(words(d["prompt"]))
+    return out
+
+
 OLD_50_3 = re.compile(r"50\(3\)[^.]{0,120}24\s?%|24\s?%[^.]{0,120}50\(3\)")
 
 
-def check_sft(d: dict, seen: set, tests: list, keep_check: bool):
+def check_sft(d: dict, seen: set, tests: list, keep_check: bool, prior: list = ()):
     for k in ("domain", "prompt", "completion"):
         if not isinstance(d.get(k), str) or not d[k].strip():
             return f"missing {k}"
@@ -106,14 +123,19 @@ def check_sft(d: dict, seen: set, tests: list, keep_check: bool):
         o = overlap(w, tw)
         if o >= OVERLAP or (o >= OVERLAP_WITH_NUMBERS and len(f & tf) >= 2):
             return "too close to a test question"
+    if any(overlap(w, pw) >= PRIOR_OVERLAP for pw in prior):
+        return "too close to an earlier batch"
     return None
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    argv = sys.argv[1:]
+    prior_dirs = [argv[i + 1] for i, a in enumerate(argv) if a == "--prior" and i + 1 < len(argv)]
+    args = [a for i, a in enumerate(argv) if not a.startswith("--") and not (i > 0 and argv[i - 1] == "--prior")]
     if not args:
         sys.exit(__doc__)
     keep_check = "--keep-check" in sys.argv
+    prior = prior_prompts(prior_dirs)
     tests, seen = test_questions(), existing_prompts()
     sft, notes, gloss, rejected = [], [], [], []
     per_batch = {}
@@ -143,7 +165,7 @@ def main():
                     rejected.append({"batch": num, "reason": "bad glossary entry", "row": d})
                     c["rejected"] += 1
             else:
-                why = check_sft(d, seen, tests, keep_check)
+                why = check_sft(d, seen, tests, keep_check, prior)
                 if why:
                     rejected.append({"batch": num, "reason": why, "row": d})
                     c["rejected"] += 1

@@ -48,7 +48,23 @@ V1_HOLD: dict[str, str] = {
     "v1 row states 24% for Section 50(3) (owner chose 18%)":
         r'(?i)50\(3\)|24% (p\.a\.?|per annum|a year|interest)|interest at 24%|24% interest|24% (p\.a|per annum) ?(for|on)|24% वार्षिक',
 }
-HOLD: dict[str, str] = {}
+# Post-supply discounts: until 31 Oct 2026 Section 15(3)(b) needed an agreement before the supply and a link to invoices.
+# Finance Act 2026 sections 153-155 (Notification 03/2026-CT) removed those conditions from 1 Nov 2026, and whether the
+# recipient must still reverse ITC is reported differently by different sources. These rows state the old conditions as the
+# test, so they are held until the amended rule is confirmed and the answers are rewritten with the date. Each pattern is the
+# start of the question, so the list is exact.
+HOLD: dict[str, str] = {
+    "states the pre-1 Nov 2026 post-supply discount conditions as current law":
+        r"^(How is GST computed on discounts\?"
+        r"|What is a credit note for a post-sale discount\?"
+        r"|Invoice of Rs 2,00,000 at 18%\. Contract gave a 3% volume discount"
+        r"|We gave a Rs 10,000 festive discount by credit note a month later"
+        r"|Supplier gave a post-sale discount through a credit note of Rs 11,800"
+        r"|Credit note and ITC: supplier issued credit note for 10% post-sale"
+        r"|Customer wants a discount of 3% on an October 2026 invoice"
+        r"|Annual volume rebate agreed in contract"
+        r"|Price reduced by agreement 6 months after supply)",
+}
 
 # Rows used in training before a CA has confirmed them, listed in assumed_pending_ca.jsonl so a CA can check them
 # later. Empty now: Section 50(3) interest at 18% a year on ITC wrongly availed and utilised (Notification 14/2022-CT

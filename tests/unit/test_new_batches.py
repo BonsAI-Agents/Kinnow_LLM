@@ -46,3 +46,22 @@ def test_ingest_filters(tmp_path):
     assert rep["accepted_training_rows"] == 1 and rep["notes"] == 1
     assert reasons["marked check"] == 1 and reasons["answer too short"] == 1 and reasons["repeated prompt"] == 1
     assert reasons["old 24% for Section 50(3)"] == 1 and reasons["not valid JSON"] == 1
+
+
+def test_ingest_rejects_rows_that_repeat_an_earlier_batch(tmp_path):
+    import os
+    prior = tmp_path / "prior"
+    prior.mkdir()
+    old = {"domain": "GST", "prompt": "Zephyr Traders in Indore sells machine parts to a Pune firm for Rs 91,000. Which tax applies?",
+           "completion": LONG, "type": "gst_pos", "confidence": "high"}
+    (prior / "batch01_gst_pos.jsonl").write_text(json.dumps(old), encoding="utf-8")
+    new = tmp_path / "new"
+    new.mkdir()
+    near = {**old, "prompt": "Zephyr Traders in Indore sells machine parts to a Pune firm for Rs 91,000. Which tax applies here?"}
+    fresh = {**old, "prompt": "A bakery in Nashik ships cakes to a customer in Goa and bills Rs 3,200 with 5% GST. What is charged?"}
+    (new / "batch10_inv_calc.jsonl").write_text(json.dumps(near) + "\n" + json.dumps(fresh), encoding="utf-8")
+    out = tmp_path / "out"
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "ingest_new_batches.py"), str(new), "--prior", str(prior)], check=True,
+                   capture_output=True, env={**os.environ, "KINNOW_INGEST_OUT": str(out)})
+    rep = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    assert rep["accepted_training_rows"] == 1 and rep["rejected_by_reason"] == {"too close to an earlier batch": 1}
