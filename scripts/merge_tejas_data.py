@@ -27,6 +27,11 @@ from generate_calc_rows import generate as generate_calc_rows  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 TEJAS_FILES = [ROOT / "data" / "tejas" / "kinnow_sft_500_v2.jsonl",             # 500 rows, Section 50(3) fixed to 18% (21 Nov 2026)
                ROOT / "data" / "tejas" / "kinnow_sft_payroll_invoice_v2.jsonl"]  # 89 worked examples and traps
+# Newer batches from Tejas (24 Nov 2026 onward), checked by scripts/ingest_new_batches.py and by hand. Each file is used only if it
+# exists, so the build works before they are added. Rows carry extra fields (type, confidence, sources); only the three
+# training fields are kept.
+NEW_FILES = [ROOT / "data" / "tejas" / "new_v3" / "sft_rows.jsonl",               # clean rows from batches 1-9 and later
+             ROOT / "data" / "tejas" / "new_v3" / "checked_rows_verified.jsonl"]  # rows flagged "check" that were verified or fixed
 V1 = ROOT / "data" / "v1_training" / "raw.jsonl"
 OUT = ROOT / "data" / "v2_training"
 
@@ -100,6 +105,8 @@ def old_regime_reasons(row: dict) -> list[str]:
 
 def main():
     tejas = [r for f in TEJAS_FILES for r in load(f)]
+    new_rows = [{k: r[k] for k in ("domain", "prompt", "completion")} for f in NEW_FILES if f.exists() for r in load(f)]
+    tejas += new_rows
     v1 = load(V1)
     held, assumed = [], []
 
@@ -171,6 +178,7 @@ def main():
         "tejas_rows_received": tejas_rows_in,
         "tejas_rows": len(tejas),
         "tejas_rows_rewritten": rewritten,
+        "new_batch_rows_included": len(new_rows),
         "rows_held_for_verification": len(held),
         "rows_assumed_confirmed_pending_ca": len(assumed),
         "held_by_source": dict(Counter(r["source"] for r in held)),
