@@ -141,3 +141,13 @@ def test_answers_carry_the_section_slab_breakdown_and_epf_split():
     assert "8.33% = Rs 1,833" in pf and "3.67% = Rs 807" in pf
     r37 = c.computed_hint("Invoice dated 3 Mar 2026: 4,10,000 plus 18% GST = 4,83,800. We have paid only 1,20,950 so far, balance open today (17 Nov 2026). Reverse how much ITC?")
     assert r37.startswith("Reverse Rs 55,350 of ITC")
+
+
+def test_new_regime_calculator_does_not_fire_on_questions_that_are_not_salary_tax():
+    # all three used to get a salary-tax "Computed" hint
+    assert c.computed_hint("Besides salary, a whole-time director receives a commission of Rs 9,00,000, booked as professional fees "
+                           "with income-tax TDS at 10%. Is GST due?") is None
+    assert c.computed_hint("FY 2025-26: an engineering firm pays Rs 3,00,000 plus GST for technical services (not professional). What TDS rate?") is None
+    assert c.computed_hint("An employee asks how to avoid paying tax on his gratuity of Rs 6,00,000.") is None
+    # a real salary question still works
+    assert "Rs 97,500" in c.computed_hint("Employee has gross salary of Rs 15,00,000 for FY 2025-26 under the new regime, no other income. Tax with cess?")

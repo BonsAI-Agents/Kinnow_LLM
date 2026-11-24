@@ -174,15 +174,24 @@ def calc_esi(q: str) -> str | None:
             f"each rounded up to the next rupee.")
 
 
+_NOT_SALARY_TAX = re.compile(
+    r"\bgst\b|\bigst\b|invoice|\bfees?\b|professional|technical|commission|contractor|vendor|supplier|director|gratuity|"
+    r"leave encash|\brent\b|dividend|capital gain|\blottery\b|crypto", re.I)
+
+
 def calc_new_regime_tax(q: str) -> str | None:
     low = q.lower()
     if "old regime" in low or "old tax regime" in low:
         return None
     if not any(w in low for w in ("tax", "tds")):
         return None
-    if not any(w in low for w in ("salary", "gross", "ctc", "pay")):
+    # It must be a salary-tax question. "pay" is not enough ("pays Rs 3,00,000 plus GST", "paying tax on gratuity"),
+    # and questions about GST, invoices, fees, gratuity or other income are not salary tax.
+    if not re.search(r"\b(salary|gross|ctc|wages|annual income|take[- ]?home)\b", low):
         return None
-    gross = _near(q, ("gross", "salary", "ctc", "pay"), 60)
+    if _NOT_SALARY_TAX.search(low):
+        return None
+    gross = _near(q, ("gross", "salary", "ctc", "wages"), 60)
     if not gross or gross < 300_000:
         return None
     taxable = gross - 75_000

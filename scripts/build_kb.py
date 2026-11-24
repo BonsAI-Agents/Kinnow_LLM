@@ -21,6 +21,21 @@ SRC = ROOT / "data/v2_training/raw.jsonl"
 OUT = ROOT / "data/knowledge/kb.jsonl"
 EXTRA = ROOT / "data/knowledge_extra/checklist_notes.jsonl"   # facts from FACTS_TO_VERIFY.md that the training data lacks
 EVAL_FILES = [ROOT / "eval/golden_set.jsonl", ROOT / "eval/hindi_eval_30.jsonl", ROOT / "eval/multiturn_eval_20.jsonl"]
+NOTES = ROOT / "data/tejas/new_v3/kb_notes_verified.jsonl"   # short rule notes from Tejas's batch 15, checked one by one
+
+
+def note_rows(entries: list[dict]) -> list[dict]:
+    """Turn knowledge notes {domain, topic, note, citation} into lookup rows. The citation goes into the text so the
+    Sources line can quote it."""
+    rows = []
+    for e in entries:
+        topic, note = (e.get("topic") or "").strip(), (e.get("note") or "").strip()
+        if not topic or not note:
+            continue
+        cite = (e.get("citation") or "").strip()
+        rows.append({"domain": e.get("domain") or "GST", "prompt": topic,
+                     "completion": note + (f" Reference: {cite}." if cite else "")})
+    return rows
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -55,6 +70,8 @@ def main() -> int:
     rows = [r for r in load(SRC) if r.get("domain") != "REFUSAL" and r.get("prompt") and r.get("completion")]
     if EXTRA.exists():
         rows += [r for r in load(EXTRA) if r.get("prompt") and r.get("completion")]
+    if NOTES.exists():
+        rows += note_rows(load(NOTES))
     # Generated calculation rows are for training only. As notes they crowd out the fact notes: a question
     # about the composition limit then retrieves worked composition examples instead of the limit itself.
     generated = {norm(g["prompt"]) for g in generate_calc_rows(42)}

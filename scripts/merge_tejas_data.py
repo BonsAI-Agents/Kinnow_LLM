@@ -32,8 +32,31 @@ TEJAS_FILES = [ROOT / "data" / "tejas" / "kinnow_sft_500_v2.jsonl",             
 # training fields are kept.
 NEW_FILES = [ROOT / "data" / "tejas" / "new_v3" / "sft_rows.jsonl",               # clean rows from batches 1-9 and later
              ROOT / "data" / "tejas" / "new_v3" / "checked_rows_verified.jsonl"]  # rows flagged "check" that were verified or fixed
+GLOSSARY_FILE = ROOT / "data" / "tejas" / "new_v3" / "glossary.jsonl"    # {term, full, meaning, also_written_as}
 V1 = ROOT / "data" / "v1_training" / "raw.jsonl"
 OUT = ROOT / "data" / "v2_training"
+
+_PAYROLL_TERMS = {"epf", "eps", "esi", "pt", "lwf", "hra", "lta", "ctc", "pan", "tan", "da", "fnf", "lop", "87a", "80c", "80d",
+                  "form 130", "form 131", "form 132", "form 138", "form 140", "form 141", "form 144", "form 122", "form 123",
+                  "form 124", "form 39", "form 16", "form 12b", "24q", "26as", "ais", "vetan", "tds", "tcs"}
+_INVOICE_TERMS = {"hsn", "sac", "irn", "lut", "e-way bill", "eway bill", "challan", "bill", "gstin"}
+
+
+def glossary_rows(entries: list[dict]) -> list[dict]:
+    """Turn glossary entries into short training rows: 'What does RCM mean?' -> 'RCM stands for ...'.
+    Teaches the model to spell terms out (our scorer looks for words such as "reverse charge")."""
+    rows = []
+    for e in entries:
+        term, full, meaning = (e.get("term") or "").strip(), (e.get("full") or "").strip(), (e.get("meaning") or "").strip()
+        if not term or not full or not meaning:
+            continue
+        key = term.lower()
+        domain = "PAYROLL" if key in _PAYROLL_TERMS else ("INVOICE" if key in _INVOICE_TERMS else "GST")
+        also = [a for a in (e.get("also_written_as") or []) if a and a.lower() != key]
+        tail = f" It is also written as {', '.join(also)}." if also else ""
+        rows.append({"domain": domain, "prompt": f"What does {term} mean?",
+                     "completion": f"{term} stands for {full}. {meaning}{tail}"})
+    return rows
 
 # Why a v1 row is not used. Each pattern is a marker of the pre-2026 income-tax regime.
 OLD_REGIME = {
@@ -69,6 +92,10 @@ HOLD: dict[str, str] = {
         r"|Customer wants a discount of 3% on an October 2026 invoice"
         r"|Annual volume rebate agreed in contract"
         r"|Price reduced by agreement 6 months after supply)",
+    # New batches (24 Nov 2026): these two apply the 1 Nov 2026 rule by SUPPLY date, but which date decides is unsettled.
+    "applies the 1 Nov 2026 post-supply discount rule by supply date (which date decides is unsettled)":
+        r"^(Supply on 6 November 2026 of Rs 4,00,000 at 18%"
+        r"|User: A wholesaler in Cuttack sold goods of Rs 9,20,000 on 10 November 2026)",
 }
 
 # Rows used in training before a CA has confirmed them, listed in assumed_pending_ca.jsonl so a CA can check them
@@ -107,6 +134,8 @@ def main():
     tejas = [r for f in TEJAS_FILES for r in load(f)]
     new_rows = [{k: r[k] for k in ("domain", "prompt", "completion")} for f in NEW_FILES if f.exists() for r in load(f)]
     tejas += new_rows
+    gloss = glossary_rows(load(GLOSSARY_FILE)) if GLOSSARY_FILE.exists() else []
+    tejas += gloss
     v1 = load(V1)
     held, assumed = [], []
 
@@ -179,6 +208,7 @@ def main():
         "tejas_rows": len(tejas),
         "tejas_rows_rewritten": rewritten,
         "new_batch_rows_included": len(new_rows),
+        "glossary_rows_included": len(gloss),
         "rows_held_for_verification": len(held),
         "rows_assumed_confirmed_pending_ca": len(assumed),
         "held_by_source": dict(Counter(r["source"] for r in held)),
