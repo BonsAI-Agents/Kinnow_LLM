@@ -64,6 +64,17 @@ def new_regime_tax(taxable: int) -> dict:
     return {"slab_tax": slab_tax, "tax": final, "cess": cess, "total": final + cess, "note": note}
 
 
+def slab_lines(taxable: int, slabs) -> str:
+    """The tax in each slab that applies, for example 'Rs 4,00,000 to Rs 8,00,000 at 5% = Rs 20,000; ...'."""
+    parts, lower = [], 0
+    for upper, rate in slabs:
+        if taxable > lower and rate:
+            top = min(taxable, upper)
+            parts.append(f"{inr(lower)} to {inr(top)} at {rate}% = {inr(rup(Decimal(top - lower) * rate / 100))}")
+        lower = upper
+    return "; ".join(parts)
+
+
 # ---------- reading numbers from a question ----------
 
 _NUM = re.compile(
@@ -138,11 +149,14 @@ def calc_epf(q: str) -> str | None:
         return None
     pf_wages = min(wage, 25_000)
     c = rup(Decimal(pf_wages) * 12 / 100)
+    eps = rup(Decimal(pf_wages) * Decimal("8.33") / 100)
+    split = (f" The employer's 12% is split: 8.33% = {inr(eps)} to the EPS pension account and "
+             f"3.67% = {inr(c - eps)} to the EPF account.")
     if wage > 25_000:
         return (f"PF wages = the lower of {inr(wage)} and the Rs 25,000 ceiling = {inr(pf_wages)}. Employee 12% = {inr(c)}; "
-                f"employer also contributes 12% = {inr(c)}.")
+                f"employer also contributes 12% = {inr(c)}." + split)
     return (f"Wages are within the Rs 25,000 ceiling, so PF wages = {inr(pf_wages)}. Employee 12% = {inr(c)}; "
-            f"employer also contributes 12% = {inr(c)}.")
+            f"employer also contributes 12% = {inr(c)}." + split)
 
 
 def calc_esi(q: str) -> str | None:
@@ -178,9 +192,10 @@ def calc_new_regime_tax(q: str) -> str | None:
         text += "It is within Rs 12,00,000, so the 87A rebate makes tax nil. Monthly TDS is nil."
     else:
         if t["note"] == "relief":
-            text += f"Slab tax is {inr(t['slab_tax'])}, but marginal relief limits tax to the income above Rs 12,00,000 = {inr(t['tax'])}. "
+            text += (f"Slab tax ({slab_lines(taxable, SLABS)}) is {inr(t['slab_tax'])}. The 87A rebate is not given above Rs 12,00,000, "
+                     f"but marginal relief under Section 87A limits tax to the income above Rs 12,00,000 = {inr(t['tax'])}. ")
         else:
-            text += f"Slab tax = {inr(t['tax'])}. "
+            text += f"Slab tax: {slab_lines(taxable, SLABS)} = {inr(t['tax'])}. "
         text += f"Cess 4% = {inr(t['cess'])}. Total tax = {inr(t['total'])}; monthly TDS = {inr(rup(Decimal(t['total']) / 12))}."
     return text
 
@@ -270,7 +285,7 @@ def calc_late_fee(q: str) -> str | None:
     nil = bool(re.search(r"\bnil\b", low))
     rate = 20 if nil else 50
     return (f"Delay is {days} days ({first.day} {first.strftime('%b')} to {filed.day} {filed.strftime('%b %Y')}). "
-            f"Late fee for a {'nil return' if nil else 'return with tax payable'} is Rs {rate} a day "
+            f"Under Section 47(1) of the CGST Act, the late fee for a {'nil return' if nil else 'return with tax payable'} is Rs {rate} a day "
             f"(Rs {rate // 2} CGST + Rs {rate // 2} SGST): {days} x {rate} = {inr(days * rate)}, "
             f"subject to the turnover-based cap. Interest at 18% on any unpaid tax is charged separately.")
 
@@ -302,9 +317,10 @@ def calc_rule37(q: str) -> str | None:
     unpaid = total - paid
     share = rup(Decimal(unpaid) * 100 / total)
     reverse = rup(Decimal(gst) * unpaid / total)
-    return (f"180 days from {inv.day} {inv.strftime('%b %Y')} ended on {deadline.day} {deadline.strftime('%b %Y')}, so Rule 37 applies "
-            f"to the unpaid part. GST on the invoice = {inr(gst)}. Unpaid = {inr(total)} - {inr(paid)} = {inr(unpaid)} "
-            f"({share}% of {inr(total)}). Reverse {inr(gst)} x {share}% = {inr(reverse)} in GSTR-3B, with interest at 18% a year "
+    return (f"Reverse {inr(reverse)} of ITC in GSTR-3B. 180 days from {inv.day} {inv.strftime('%b %Y')} ended on "
+            f"{deadline.day} {deadline.strftime('%b %Y')}, so Rule 37 applies to the unpaid part. GST on the invoice = {inr(gst)}. "
+            f"Unpaid = {inr(total)} - {inr(paid)} = {inr(unpaid)} ({share}% of {inr(total)}). "
+            f"Reverse {inr(gst)} x {share}% = {inr(reverse)}, with interest at 18% a year "
             f"from the date the ITC was availed to the date of reversal. It can be re-availed when the balance is paid.")
 
 
@@ -333,7 +349,7 @@ def calc_old_regime_tax(q: str) -> str | None:
     if taxable <= 500_000:
         return text + "It is within Rs 5,00,000, so the 87A rebate makes tax nil."
     cess = rup(Decimal(slab_tax) * 4 / 100)
-    return (text + f"Slab tax = {inr(slab_tax)} (nil to 2.5 lakh, 5% to 5 lakh, 20% to 10 lakh, 30% above). "
+    return (text + f"Slab tax: {slab_lines(taxable, slabs)} = {inr(slab_tax)}. "
             f"The 87A rebate is not available because income exceeds Rs 5 lakh. Cess 4% = {inr(cess)}. Total tax = {inr(slab_tax + cess)}.")
 
 

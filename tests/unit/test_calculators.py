@@ -128,3 +128,16 @@ def test_sources_line_uses_only_what_the_notes_cite():
 def test_every_calculator_survives_garbage(fn):
     assert fn("") is None or isinstance(fn(""), str)
     assert fn("Rs ,,, 999999999999999 days lakh crore ESI PF gratuity interest tax salary") is None or True
+
+
+def test_answers_carry_the_section_slab_breakdown_and_epf_split():
+    nil = c.computed_hint("Nil GSTR-1 for August 2026 (due 11 Sep) was filed on 20 Sep 2026. Late fee?")
+    assert "Section 47(1)" in nil
+    tax = c.computed_hint("Employee has gross salary of Rs 15,00,000 for FY 2025-26 under the new regime, no other income. Tax with cess?")
+    assert "at 5% = Rs 20,000" in tax and "at 10% = Rs 40,000" in tax and "at 15% = Rs 33,750" in tax
+    relief = c.computed_hint("New regime FY 2025-26, gross salary Rs 12,90,000 and nothing else. The employee says the 12 lakh rebate is gone. Full slab tax?")
+    assert "87A" in relief and "marginal relief" in relief
+    pf = c.computed_hint("Basic plus DA Rs 22,000 per month, all within the EPF wage ceiling. Show the contribution rates for employee and employer.")
+    assert "8.33% = Rs 1,833" in pf and "3.67% = Rs 807" in pf
+    r37 = c.computed_hint("Invoice dated 3 Mar 2026: 4,10,000 plus 18% GST = 4,83,800. We have paid only 1,20,950 so far, balance open today (17 Nov 2026). Reverse how much ITC?")
+    assert r37.startswith("Reverse Rs 55,350 of ITC")
