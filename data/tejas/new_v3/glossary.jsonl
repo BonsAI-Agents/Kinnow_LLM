@@ -1,0 +1,80 @@
+{"term": "RCM", "full": "reverse charge mechanism", "meaning": "The buyer, not the seller, pays the GST on certain notified supplies.", "also_written_as": ["reverse charge", "RCM"]}
+{"term": "ITC", "full": "input tax credit", "meaning": "GST paid on purchases that can be set off against GST payable on sales.", "also_written_as": ["input credit", "ITC"]}
+{"term": "IGST", "full": "integrated goods and services tax", "meaning": "GST charged on inter-state supplies, imports and exports.", "also_written_as": ["integrated GST", "IGST"]}
+{"term": "CGST", "full": "central goods and services tax", "meaning": "The central government's half of GST on a supply within one state.", "also_written_as": ["central GST", "CGST"]}
+{"term": "SGST", "full": "state goods and services tax", "meaning": "The state government's half of GST on a supply within one state.", "also_written_as": ["state GST", "SGST"]}
+{"term": "UTGST", "full": "Union territory goods and services tax", "meaning": "GST charged in place of SGST in Union territories without their own legislature.", "also_written_as": ["UT GST", "UTGST"]}
+{"term": "GSTIN", "full": "goods and services tax identification number", "meaning": "The 15-character registration number given to every GST-registered business.", "also_written_as": ["GST number", "GST no", "GSTIN"]}
+{"term": "HSN", "full": "Harmonised System of Nomenclature", "meaning": "The code used to classify goods on invoices and in returns.", "also_written_as": ["HSN code", "HSN"]}
+{"term": "SAC", "full": "services accounting code", "meaning": "The code used to classify services on invoices and in returns.", "also_written_as": ["service code", "SAC"]}
+{"term": "LUT", "full": "letter of undertaking", "meaning": "A yearly declaration that lets an exporter export without paying IGST.", "also_written_as": ["LUT", "bond"]}
+{"term": "IRN", "full": "invoice reference number", "meaning": "The unique number the invoice registration portal gives to each e-invoice.", "also_written_as": ["IRN", "e-invoice number"]}
+{"term": "IRP", "full": "invoice registration portal", "meaning": "The government portal where e-invoices are reported to get an IRN.", "also_written_as": ["IRP", "e-invoice portal"]}
+{"term": "OIDAR", "full": "online information and database access or retrieval services", "meaning": "Digital services delivered over the internet with little human involvement, such as subscriptions and downloads.", "also_written_as": ["online services", "OIDAR"]}
+{"term": "GTA", "full": "goods transport agency", "meaning": "A transport business that issues a consignment note for carrying goods by road.", "also_written_as": ["transporter", "GTA"]}
+{"term": "NBFC", "full": "non-banking financial company", "meaning": "A company that lends or invests like a bank but does not hold a banking licence.", "also_written_as": ["NBFC", "finance company"]}
+{"term": "TDS", "full": "tax deducted at source", "meaning": "Tax the payer cuts from a payment and deposits with the government on the payee's behalf.", "also_written_as": ["TDS", "tax deduction"]}
+{"term": "TCS", "full": "tax collected at source", "meaning": "Tax a seller or e-commerce operator collects and deposits on another person's behalf.", "also_written_as": ["TCS", "tax collection"]}
+{"term": "EPF", "full": "Employees' Provident Fund", "meaning": "The retirement savings scheme where employee and employer each contribute 12% of wages.", "also_written_as": ["PF", "provident fund", "EPF"]}
+{"term": "EPS", "full": "Employees' Pension Scheme", "meaning": "The pension scheme that receives part of the employer's PF contribution.", "also_written_as": ["pension scheme", "EPS"]}
+{"term": "EDLI", "full": "Employees' Deposit Linked Insurance", "meaning": "The life cover scheme linked to PF, paid for by the employer.", "also_written_as": ["EDLI", "PF insurance"]}
+{"term": "UAN", "full": "universal account number", "meaning": "The permanent PF account number an employee keeps across jobs.", "also_written_as": ["UAN", "PF number"]}
+{"term": "ESI", "full": "Employees' State Insurance", "meaning": "The medical and cash-benefit scheme for employees earning up to Rs 21,000 a month.", "also_written_as": ["ESIC", "ESI"]}
+{"term": "PT", "full": "professional tax", "meaning": "A state tax on salaried employees and professionals, deducted from salary in some states.", "also_written_as": ["professional tax", "PT"]}
+{"term": "LWF", "full": "labour welfare fund", "meaning": "A small state levy from employees and employers for worker welfare, in some states.", "also_written_as": ["labour welfare", "LWF"]}
+{"term": "HRA", "full": "house rent allowance", "meaning": "A salary allowance for rent, partly exempt under the old regime.", "also_written_as": ["house rent", "HRA"]}
+{"term": "LTA", "full": "leave travel allowance", "meaning": "An allowance for travel during leave, exempt within limits under the old regime.", "also_written_as": ["LTC", "leave travel", "LTA"]}
+{"term": "CTC", "full": "cost to company", "meaning": "The total annual cost of an employee to the employer, including employer contributions.", "also_written_as": ["CTC", "package"]}
+{"term": "PAN", "full": "permanent account number", "meaning": "The 10-character income-tax identity number of a person or business.", "also_written_as": ["PAN", "PAN card"]}
+{"term": "TAN", "full": "tax deduction and collection account number", "meaning": "The number an employer or payer needs to deduct and deposit TDS.", "also_written_as": ["TAN"]}
+{"term": "DA", "full": "dearness allowance", "meaning": "An allowance linked to the cost of living, counted with basic pay for PF.", "also_written_as": ["DA", "dearness"]}
+{"term": "FnF", "full": "full and final settlement", "meaning": "The final payment of all dues to an employee who leaves.", "also_written_as": ["full and final", "F&F", "FnF"]}
+{"term": "LOP", "full": "loss of pay", "meaning": "Salary deducted for days of unpaid absence.", "also_written_as": ["loss of pay", "LWP", "leave without pay"]}
+{"term": "Form 130", "full": "Form 130 (earlier Form 16)", "meaning": "The annual certificate of salary TDS from tax year 2026-27.", "also_written_as": ["Form 16", "Form 130"]}
+{"term": "Form 138", "full": "Form 138 (earlier Form 24Q)", "meaning": "The quarterly statement of salary TDS filed by the employer from tax year 2026-27.", "also_written_as": ["24Q", "Form 24Q", "Form 138"]}
+{"term": "Form 122", "full": "Form 122 (earlier Form 12B)", "meaning": "The form a new employee uses to give salary details from a previous employer in the same year.", "also_written_as": ["Form 12B", "Form 122"]}
+{"term": "Form 123", "full": "Form 123 (earlier Form 12BA)", "meaning": "The statement of perquisites and profits in lieu of salary.", "also_written_as": ["Form 12BA", "Form 123"]}
+{"term": "Form 124", "full": "Form 124 (earlier Form 12BB)", "meaning": "The employee's declaration of investments, rent and loans for TDS.", "also_written_as": ["Form 12BB", "investment declaration", "Form 124"]}
+{"term": "Form 131", "full": "Form 131 (earlier Form 16A)", "meaning": "The TDS certificate for non-salary payments from tax year 2026-27.", "also_written_as": ["Form 16A", "Form 131"]}
+{"term": "Form 140", "full": "Form 140 (earlier Form 26Q)", "meaning": "The quarterly statement of non-salary TDS on residents from tax year 2026-27.", "also_written_as": ["26Q", "Form 26Q", "Form 140"]}
+{"term": "Form 144", "full": "Form 144 (earlier Form 27Q)", "meaning": "The quarterly statement of TDS on payments to non-residents from tax year 2026-27.", "also_written_as": ["27Q", "Form 27Q", "Form 144"]}
+{"term": "Form 141", "full": "Form 141 (earlier Forms 26QB, 26QC, 26QD, 26QE)", "meaning": "The challan-cum-statement for specified one-off TDS, such as on property purchase or rent paid by individuals.", "also_written_as": ["26QB", "26QC", "Form 141"]}
+{"term": "Section 392", "full": "Section 392 of the Income-tax Act, 2025", "meaning": "The section for TDS on salary from 1 April 2026, replacing Section 192.", "also_written_as": ["Sec 392", "Section 192"]}
+{"term": "Section 393", "full": "Section 393 of the Income-tax Act, 2025", "meaning": "The section for TDS on most non-salary payments from 1 April 2026.", "also_written_as": ["Sec 393", "194J", "194C"]}
+{"term": "87A", "full": "rebate under Section 87A (Section 156 from 2026-27)", "meaning": "The rebate that makes tax nil up to Rs 12 lakh taxable income in the new regime.", "also_written_as": ["rebate", "87A", "Section 156"]}
+{"term": "80C", "full": "deduction under Section 80C", "meaning": "An old-regime deduction up to Rs 1,50,000 for PF, PPF, life insurance and similar items.", "also_written_as": ["80C", "section 80C"]}
+{"term": "80D", "full": "deduction under Section 80D", "meaning": "An old-regime deduction for health insurance premiums for self, family and parents.", "also_written_as": ["80D", "mediclaim deduction"]}
+{"term": "26AS", "full": "Form 26AS", "meaning": "The annual statement showing TDS and TCS credited against a PAN.", "also_written_as": ["26AS", "tax credit statement"]}
+{"term": "AIS", "full": "annual information statement", "meaning": "The income-tax department's statement of a taxpayer's reported incomes and transactions.", "also_written_as": ["AIS"]}
+{"term": "GSTR-1", "full": "GSTR-1 return", "meaning": "The return of outward supplies, due on the 11th of the next month.", "also_written_as": ["GSTR1", "sales return"]}
+{"term": "GSTR-1A", "full": "GSTR-1A", "meaning": "The form to amend or add to GSTR-1 before filing GSTR-3B for the same period.", "also_written_as": ["GSTR 1A"]}
+{"term": "GSTR-2B", "full": "GSTR-2B statement", "meaning": "The monthly statement of input tax credit available from suppliers' filings.", "also_written_as": ["2B", "GSTR2B"]}
+{"term": "GSTR-3B", "full": "GSTR-3B return", "meaning": "The monthly summary return with tax payment, due on the 20th.", "also_written_as": ["3B", "GSTR3B"]}
+{"term": "IMS", "full": "invoice management system", "meaning": "The GST portal tool to accept, reject or keep pending supplier invoices before GSTR-2B.", "also_written_as": ["IMS"]}
+{"term": "QRMP", "full": "quarterly return monthly payment scheme", "meaning": "A scheme for small taxpayers to file returns quarterly but pay tax monthly.", "also_written_as": ["QRMP", "quarterly scheme"]}
+{"term": "CMP-08", "full": "Form GST CMP-08", "meaning": "The quarterly statement and payment form for composition dealers.", "also_written_as": ["CMP08", "CMP-08"]}
+{"term": "PMT-06", "full": "Form GST PMT-06", "meaning": "The GST challan used to deposit tax, interest and late fee in cash.", "also_written_as": ["GST challan", "PMT 06"]}
+{"term": "E-way bill", "full": "electronic way bill", "meaning": "The electronic document needed to move goods worth more than Rs 50,000.", "also_written_as": ["EWB", "eway bill", "e-way bill"]}
+{"term": "B2B", "full": "business to business", "meaning": "A sale to a registered business buyer.", "also_written_as": ["B2B"]}
+{"term": "B2C", "full": "business to consumer", "meaning": "A sale to an unregistered buyer, usually a consumer.", "also_written_as": ["B2C", "retail sale"]}
+{"term": "SEZ", "full": "special economic zone", "meaning": "A notified zone whose units buy and sell under special GST rules, treated like exports.", "also_written_as": ["SEZ"]}
+{"term": "DTA", "full": "domestic tariff area", "meaning": "Any part of India outside a special economic zone.", "also_written_as": ["DTA"]}
+{"term": "POS", "full": "place of supply", "meaning": "The state where a supply is treated as made, which decides IGST or CGST and SGST.", "also_written_as": ["place of supply", "POS"]}
+{"term": "Composition", "full": "composition scheme", "meaning": "A simple scheme where small businesses pay a flat rate on turnover without ITC.", "also_written_as": ["composition dealer", "CMP"]}
+{"term": "Credit note", "full": "credit note", "meaning": "A document that reduces the value or tax of an earlier invoice.", "also_written_as": ["CN", "credit note"]}
+{"term": "Debit note", "full": "debit note", "meaning": "A document that increases the value or tax of an earlier invoice.", "also_written_as": ["DN", "debit note"]}
+{"term": "Bill of supply", "full": "bill of supply", "meaning": "A document without tax, issued for exempt supplies or by composition dealers.", "also_written_as": ["bill of supply"]}
+{"term": "Receipt voucher", "full": "receipt voucher", "meaning": "A document issued when an advance is received.", "also_written_as": ["advance receipt"]}
+{"term": "Delivery challan", "full": "delivery challan", "meaning": "A document that goes with goods moved without a sale, such as for job work.", "also_written_as": ["DC", "challan"]}
+{"term": "vetan", "full": "vetan (salary)", "meaning": "Hindi word for salary or wages paid to an employee.", "also_written_as": ["vetan", "वेतन", "salary"]}
+{"term": "challan", "full": "challan", "meaning": "A payment slip or form used to deposit tax, or a document sent with goods.", "also_written_as": ["challan", "चालान"]}
+{"term": "bill", "full": "bill", "meaning": "An invoice or bill raised for a sale, or a bill received from a supplier.", "also_written_as": ["bill", "बिल", "invoice"]}
+{"term": "karyalay", "full": "karyalay (office)", "meaning": "Hindi word for office or place of work.", "also_written_as": ["karyalay", "कार्यालय", "office"]}
+{"term": "kar", "full": "kar (tax)", "meaning": "Hindi word for tax.", "also_written_as": ["kar", "कर", "tax"]}
+{"term": "bhugtan", "full": "bhugtan (payment)", "meaning": "Hindi word for payment.", "also_written_as": ["bhugtan", "भुगतान", "payment"]}
+{"term": "chhoot", "full": "chhoot (exemption or discount)", "meaning": "Hindi word for an exemption or a discount, depending on context.", "also_written_as": ["chhoot", "छूट", "discount", "exemption"]}
+{"term": "naukri chhodna", "full": "naukri chhodna (resignation)", "meaning": "Hinglish phrase for leaving a job, which starts the full and final settlement.", "also_written_as": ["resign", "naukri chhodna"]}
+{"term": "kitna tax lagega", "full": "kitna tax lagega (how much tax applies)", "meaning": "Common Hinglish question asking how much GST or income tax is due.", "also_written_as": ["kitna tax lagega", "kitna GST lagega"]}
+{"term": "ITC milega ya nahi", "full": "ITC milega ya nahi (is ITC available)", "meaning": "Common Hinglish question asking whether input tax credit can be claimed.", "also_written_as": ["ITC milega", "ITC milega ya nahi"]}
+{"term": "GST 2.0", "full": "GST 2.0 rate reform", "meaning": "The rate change from 22 September 2025 that moved GST to 5%, 18% and 40%.", "also_written_as": ["GST 2.0", "new GST rates"]}
+{"term": "Gratuity", "full": "gratuity", "meaning": "A lump sum paid to an employee on leaving after qualifying service, at 15 days' wages per year.", "also_written_as": ["gratuity", "gratuity payment"]}
