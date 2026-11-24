@@ -16,6 +16,7 @@ Usage:
 """
 
 import json
+import os
 import re
 import sys
 from collections import Counter
@@ -30,8 +31,11 @@ TEJAS_FILES = [ROOT / "data" / "tejas" / "kinnow_sft_500_v2.jsonl",             
 # Newer batches from Tejas (24 Nov 2026 onward), checked by scripts/ingest_new_batches.py and by hand. Each file is used only if it
 # exists, so the build works before they are added. Rows carry extra fields (type, confidence, sources); only the three
 # training fields are kept.
-NEW_FILES = [ROOT / "data" / "tejas" / "new_v3" / "sft_rows.jsonl",               # clean rows from batches 1-9 and later
+NEW_FILES = [ROOT / "data" / "tejas" / "new_v3" / "sft_rows_checked.jsonl",        # clean rows that went through the research check
              ROOT / "data" / "tejas" / "new_v3" / "checked_rows_verified.jsonl"]  # rows flagged "check" that were verified or fixed
+# Clean rows that have NOT been individually checked stay out of training unless asked for: KINNOW_INCLUDE_UNCHECKED=1.
+if os.getenv("KINNOW_INCLUDE_UNCHECKED") == "1":
+    NEW_FILES.append(ROOT / "data" / "tejas" / "new_v3" / "sft_rows_unchecked.jsonl")
 GLOSSARY_FILE = ROOT / "data" / "tejas" / "new_v3" / "glossary.jsonl"    # {term, full, meaning, also_written_as}
 V1 = ROOT / "data" / "v1_training" / "raw.jsonl"
 OUT = ROOT / "data" / "v2_training"

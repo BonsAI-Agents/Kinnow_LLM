@@ -90,6 +90,12 @@ def main() -> None:
     with open(OUT / "sft_rows.jsonl", "w", encoding="utf-8", newline="\n") as f:
         for r in out:
             f.write(json.dumps({k: r[k] for k in ("domain", "prompt", "completion")}, ensure_ascii=False) + "\n")
+    # Rows that went through the research check are used for training. The others are kept apart until they are checked.
+    for name, flag in (("sft_rows_checked.jsonl", True), ("sft_rows_unchecked.jsonl", False)):
+        with open(OUT / name, "w", encoding="utf-8", newline="\n") as f:
+            for r in out:
+                if r["_checked"] == flag:
+                    f.write(json.dumps({k: r[k] for k in ("domain", "prompt", "completion")}, ensure_ascii=False) + "\n")
     with open(OUT / "sft_rows_status.jsonl", "w", encoding="utf-8", newline="\n") as f:
         for r in out:
             f.write(json.dumps({"id": r["_id"], "checked": r["_checked"]}) + "\n")
