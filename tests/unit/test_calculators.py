@@ -45,8 +45,44 @@ def test_new_regime_rebate_and_relief():
     assert "marginal relief" in rs1 and "Rs 104" in rs1       # Rs 100 tax + 4% cess
 
 
-def test_old_regime_is_left_to_the_model():
-    assert c.computed_hint("Old regime, FY 2025-26. Gross salary Rs 8,00,000, tax payable?") is None
+def test_old_regime_plain_case_is_computed_and_complex_cases_are_left_to_the_model():
+    out = c.computed_hint("Old regime, FY 2025-26. Gross salary Rs 8,00,000, tax payable?")
+    assert "Rs 7,50,000" in out and "Rs 62,500" in out and "Rs 65,000" in out        # 12,500 + 50,000, cess 2,500
+    six = c.computed_hint("Old regime, FY 2025-26. Gross salary Rs 8,00,000, 80C investments Rs 1,50,000. Tax with cess?")
+    assert "Rs 32,500" in six and "Rs 33,800" in six
+    assert c.computed_hint("Old regime, gross salary Rs 8,00,000, pays rent of Rs 20,000 a month. Tax?") is None   # HRA: not plain
+    assert c.computed_hint("Gross salary Rs 5,50,000, old regime. Tax?").endswith("makes tax nil.")
+
+
+def test_late_fee_counts_the_days_and_picks_the_rate():
+    q = "GSTR-3B for August 2026 (due 20 Sep, tax payable) was filed on 3 Oct 2026. Compute the late fee."
+    out = c.computed_hint(q)
+    assert "13 days" in out and "13 x 50 = Rs 650" in out
+    nil = c.computed_hint("Nil GSTR-1 for August 2026 (due 11 Sep) was filed on 20 Sep 2026. Late fee?")
+    assert "9 days" in nil and "Rs 180" in nil and "Rs 20 a day" in nil
+    assert c.computed_hint("GSTR-9 late fee for 2025-26, filed 30 days late?") is None        # annual return: different rule
+    assert c.computed_hint("What is the late fee for GSTR-3B?") is None                       # no dates
+
+
+def test_rule_37_reverses_the_unpaid_share_after_180_days():
+    q = ("Invoice dated 3 Mar 2026: 4,10,000 plus 18% GST = 4,83,800. We have paid only 1,20,950 so far, "
+         "balance still open today (17 Nov 2026). What is the ITC position and how much do we reverse?")
+    out = c.computed_hint(q)
+    assert "30 Aug 2026" in out and "Rs 55,350" in out and "75%" in out
+    early = c.computed_hint("Invoice dated 3 Oct 2026: 1,00,000 plus 18% GST. We have paid Rs 50,000, balance open today (17 Nov 2026). Reverse ITC?")
+    assert "does not yet require" in early
+
+
+def test_hra_exemption_is_the_least_of_three_and_never_guesses_the_city():
+    out = c.computed_hint("Basic is Rs 40,000 per month, HRA received Rs 16,000, rent paid Rs 15,000 in Mumbai. Old regime. Monthly HRA exemption?")
+    assert "Rs 11,000 a month" in out and "Rs 5,000" in out
+    assert c.computed_hint("Basic Rs 40,000 per month, HRA Rs 16,000, rent Rs 15,000 in Pune. Monthly HRA exemption?") is None
+
+
+def test_new_regime_marginal_relief_with_a_second_amount_in_the_question():
+    out = c.computed_hint("New regime FY 2025-26, gross salary Rs 12,90,000 and nothing else. "
+                          "The employee says the 12 lakh rebate is gone. Is tax the full slab tax?")
+    assert "Rs 62,250" in out and "Rs 15,000" in out and "Rs 15,600" in out
 
 
 def test_epf_uses_the_25000_ceiling():

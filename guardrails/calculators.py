@@ -208,6 +208,173 @@ def calc_interest(q: str) -> str | None:
 CALCULATORS = (calc_gratuity, calc_epf, calc_esi, calc_new_regime_tax, calc_interest)
 
 
+# ---------- specialist calculators: each has its own strict trigger, so they run without the one-amount gate ----------
+
+_MONTHS = {m: i for i, m in enumerate(
+    ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
+_DATE = re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?(?:\s+(20\d\d))?",
+                   re.I)
+
+
+def _dates(text: str):
+    """[(position, day, month, year or None)] for every 'd Mon [yyyy]' in the text."""
+    return [(m.start(), int(m.group(1)), _MONTHS[m.group(2).lower()], int(m.group(3)) if m.group(3) else None)
+            for m in _DATE.finditer(text)]
+
+
+def _date_after(text: str, words: tuple[str, ...], window: int = 30):
+    """First date within `window` characters after any of `words`, as (day, month, year or None)."""
+    low = text.lower()
+    for w in words:
+        i = low.find(w)
+        while i != -1:
+            for pos, d, m, y in _dates(text):
+                if i < pos <= i + len(w) + window:
+                    return d, m, y
+            i = low.find(w, i + 1)
+    return None
+
+
+def _to_date(parts, default_year):
+    import datetime
+    d, m, y = parts
+    try:
+        return datetime.date(y or default_year, m, d)
+    except (ValueError, TypeError):
+        return None
+
+
+def calc_late_fee(q: str) -> str | None:
+    """GSTR-1 / GSTR-3B late fee: days late x Rs 50 (Rs 20 for a nil return). Needs the due date and the filing date."""
+    import datetime
+    low = q.lower()
+    if "late fee" not in low or not re.search(r"gstr[- ]?1\b|gstr[- ]?3b|\b3b\b", low):
+        return None
+    if re.search(r"gstr[- ]?(9|4|7|8)\b|qrmp|composition|annual", low):
+        return None
+    due_p, filed_p = _date_after(q, ("due",)), _date_after(q, ("filed", "furnished", "submitted"))
+    if not due_p or not filed_p:
+        return None
+    year = filed_p[2] or due_p[2]
+    if not year:
+        return None
+    due, filed = _to_date(due_p, due_p[2] or year), _to_date(filed_p, year)
+    if not due or not filed:
+        return None
+    if filed < due and due_p[2] is None:          # due date in the year before filing ("due 20 Dec", filed 3 Jan)
+        due = _to_date(due_p, year - 1)
+    days = (filed - due).days if due else 0
+    if days <= 0 or days > 366:
+        return None
+    first = due + datetime.timedelta(days=1)
+    nil = bool(re.search(r"\bnil\b", low))
+    rate = 20 if nil else 50
+    return (f"Delay is {days} days ({first.day} {first.strftime('%b')} to {filed.day} {filed.strftime('%b %Y')}). "
+            f"Late fee for a {'nil return' if nil else 'return with tax payable'} is Rs {rate} a day "
+            f"(Rs {rate // 2} CGST + Rs {rate // 2} SGST): {days} x {rate} = {inr(days * rate)}, "
+            f"subject to the turnover-based cap. Interest at 18% on any unpaid tax is charged separately.")
+
+
+def calc_rule37(q: str) -> str | None:
+    """Rule 37: ITC reversal for the unpaid part of an invoice once 180 days have passed."""
+    import datetime
+    low = q.lower()
+    if "itc" not in low or "paid" not in low or not re.search(r"rule 37|180|reverse|unpaid|balance", low):
+        return None
+    m = re.search(r"(\d[\d,]*)\s*plus\s*(\d+(?:\.\d+)?)\s*%\s*gst", low)
+    if not m:
+        return None
+    base, rate = int(m.group(1).replace(",", "")), Decimal(m.group(2))
+    total = rup(Decimal(base) * (100 + rate) / 100)
+    paid = _near(q, ("paid", "pay"), 50)
+    inv_p, today_p = _date_after(q, ("dated", "invoice"), 12), _date_after(q, ("today",), 20)
+    if not paid or not inv_p or not today_p or paid > total:
+        return None
+    inv = _to_date(inv_p, inv_p[2] or today_p[2])
+    today = _to_date(today_p, today_p[2] or inv_p[2])
+    if not inv or not today:
+        return None
+    deadline = inv + datetime.timedelta(days=180)
+    gst = total - base
+    if today <= deadline:
+        return (f"180 days from {inv.day} {inv.strftime('%b %Y')} end on {deadline.day} {deadline.strftime('%b %Y')}, "
+                f"which is after {today.day} {today.strftime('%b %Y')}, so Rule 37 does not yet require a reversal.")
+    unpaid = total - paid
+    share = rup(Decimal(unpaid) * 100 / total)
+    reverse = rup(Decimal(gst) * unpaid / total)
+    return (f"180 days from {inv.day} {inv.strftime('%b %Y')} ended on {deadline.day} {deadline.strftime('%b %Y')}, so Rule 37 applies "
+            f"to the unpaid part. GST on the invoice = {inr(gst)}. Unpaid = {inr(total)} - {inr(paid)} = {inr(unpaid)} "
+            f"({share}% of {inr(total)}). Reverse {inr(gst)} x {share}% = {inr(reverse)} in GSTR-3B, with interest at 18% a year "
+            f"from the date the ITC was availed to the date of reversal. It can be re-availed when the balance is paid.")
+
+
+_OLD_BLOCK = re.compile(r"hra|rent|80d|80ccd|nps|home loan|24\(b\)|housing|perquisite|bonus|arrears|previous employer|"
+                        r"other income|interest income|mid[- ]?year|joined|lta|ctc|compare|new regime|which regime", re.I)
+
+
+def calc_old_regime_tax(q: str) -> str | None:
+    """Old regime tax for a salaried person with only the standard deduction and (optionally) 80C."""
+    low = q.lower()
+    if "old regime" not in low or not any(w in low for w in ("tax", "tds")) or _OLD_BLOCK.search(q):
+        return None
+    gross = _near(q, ("gross", "salary", "pay"), 50)
+    if not gross or gross < 300_000:
+        return None
+    c80 = min(_near(q, ("80c",), 40) or 0, 150_000)
+    taxable = gross - 50_000 - c80
+    slabs = [(250_000, 0), (500_000, 5), (1_000_000, 20), (10**12, 30)]
+    tax, lower = Decimal(0), 0
+    for upper, rate in slabs:
+        if taxable > lower:
+            tax += Decimal(min(taxable, upper) - lower) * rate / 100
+        lower = upper
+    slab_tax = rup(tax)
+    text = f"Taxable = {inr(gross)} - Rs 50,000 standard deduction" + (f" - {inr(c80)} (80C)" if c80 else "") + f" = {inr(taxable)}. "
+    if taxable <= 500_000:
+        return text + "It is within Rs 5,00,000, so the 87A rebate makes tax nil."
+    cess = rup(Decimal(slab_tax) * 4 / 100)
+    return (text + f"Slab tax = {inr(slab_tax)} (nil to 2.5 lakh, 5% to 5 lakh, 20% to 10 lakh, 30% above). "
+            f"The 87A rebate is not available because income exceeds Rs 5 lakh. Cess 4% = {inr(cess)}. Total tax = {inr(slab_tax + cess)}.")
+
+
+_METRO = ("delhi", "mumbai", "kolkata", "chennai")
+
+
+def calc_hra(q: str) -> str | None:
+    """Monthly HRA exemption (old regime): least of actual HRA, rent minus 10% of basic, 50% (metro) or 40% of basic."""
+    low = q.lower()
+    if "hra" not in low or "basic" not in low or "rent" not in low or not re.search(r"per month|a month|monthly", low):
+        return None
+    if re.search(r"annual|per year|yearly|\bda\b|dearness|commission", low) or "new regime" in low:
+        return None
+    if any(c in low for c in _METRO):
+        pct = 50
+    elif "non-metro" in low or "non metro" in low:
+        pct = 40
+    else:
+        return None                                   # a city outside the four classic metros: do not guess
+    basic, hra, rent = _near(q, ("basic",), 40), _near(q, ("hra",), 40), _near(q, ("rent",), 40)
+    if not (basic and hra and rent):
+        return None
+    a, b, c = hra, rent - basic // 10, rup(Decimal(basic) * pct / 100)
+    least = max(min(a, b, c), 0)
+    return (f"HRA exemption is the least of: (a) actual HRA = {inr(a)}; (b) rent paid minus 10% of basic = {inr(rent)} - {inr(basic // 10)} "
+            f"= {inr(b)}; (c) {pct}% of basic = {inr(c)}. The least is {inr(least)} a month; the balance of HRA, {inr(max(hra - least, 0))}, is taxable.")
+
+
+def calc_new_regime_marginal(q: str) -> str | None:
+    """New-regime tax when the question has more than one amount (for example a '12 lakh' threshold) but is otherwise plain."""
+    low = q.lower()
+    if "new regime" not in low or re.search(
+            r"80c|80d|hra|rent|bonus|arrears|previous employer|mid[- ]?year|joined|ctc|perquisite|other income|interest|old regime|"
+            r"compare|which regime|2026-27|tax year 2026", low):
+        return None
+    return calc_new_regime_tax(q)
+
+
+SPECIALISTS = (calc_late_fee, calc_rule37, calc_old_regime_tax, calc_hra, calc_new_regime_marginal)
+
+
 # Wording that means the question is not the plain textbook case, so a single formula would mislead
 _NOT_PLAIN = re.compile(
     r"bonus|80c|80d|deduction|ctc|take[- ]?home|compare|comparison|which regime|portion|cash|ledger|net |balance|"
@@ -219,8 +386,15 @@ _NOT_PLAIN = re.compile(
 def computed_hint(question: str) -> str | None:
     """The system's own working for a plain calculation question, or None.
 
-    Silent unless the question holds exactly one money amount and none of the wording that makes a
-    calculation depend on more than one formula."""
+    The specialist calculators run first: each has its own strict trigger. Otherwise silent unless the question
+    holds exactly one money amount and none of the wording that makes a calculation depend on more than one formula."""
+    for fn in SPECIALISTS:
+        try:
+            r = fn(question)
+        except Exception:
+            r = None
+        if r:
+            return r
     big = {v for v, _, _ in amounts(question) if v >= 1000}
     if len(big) != 1 or _NOT_PLAIN.search(question):
         return None
