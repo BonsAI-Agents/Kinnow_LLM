@@ -116,6 +116,19 @@ def _near(text: str, words: tuple[str, ...], window: int = 60):
     return None
 
 
+def _amount_before(text: str, words: tuple[str, ...], window: int = 12):
+    """The money amount written just before one of `words`, for example '23k gross'."""
+    low = text.lower()
+    for w in words:
+        i = low.find(w)
+        while i != -1:
+            for v, s, e in amounts(text):
+                if v >= 100 and 0 <= i - e <= window:
+                    return v
+            i = low.find(w, i + 1)
+    return None
+
+
 # ---------- calculators: each returns a short "Computed" text or None ----------
 
 
@@ -163,7 +176,10 @@ def calc_esi(q: str) -> str | None:
     low = q.lower()
     if "esi" not in re.findall(r"[a-z]+", low):
         return None
-    wage = _near(q, ("gross", "wages", "salary", "pay"), 60)
+    # A person with a disability has a higher ceiling (Rs 25,000); do not guess, leave it to the model
+    if re.search(r"disab", low) and not re.search(r"\b(no|not|without|non)\b[^.?]{0,15}disab", low):
+        return None
+    wage = _near(q, ("gross", "wages", "salary", "pay"), 60) or _amount_before(q, ("gross", "wages", "salary"))
     if not wage:
         return None
     if wage > 21_000:
@@ -397,7 +413,197 @@ def calc_new_regime_marginal(q: str) -> str | None:
     return calc_new_regime_tax(q)
 
 
-SPECIALISTS = (calc_late_fee, calc_rule37, calc_old_regime_tax, calc_hra, calc_new_regime_marginal)
+_AFTER_APR_2026 = re.compile(
+    r"2026-27|2026/27|tax year 2026|fy 2026|\b(?:apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+2026|\b2027\b", re.I)
+
+
+def _nr_text(taxable: int) -> str:
+    """New-regime tax working for a taxable income (FY 2025-26 slabs), in the same words as calc_new_regime_tax."""
+    t = new_regime_tax(taxable)
+    if t["note"] == "rebate":
+        return (f"Slab tax: {slab_lines(taxable, SLABS)} = {inr(t['slab_tax'])}. Taxable income is within Rs 12,00,000, "
+                f"so the Section 87A rebate reduces the tax to nil.")
+    if t["note"] == "relief":
+        return (f"Slab tax: {slab_lines(taxable, SLABS)} = {inr(t['slab_tax'])}. Marginal relief under Section 87A limits tax to "
+                f"the income above Rs 12,00,000 = {inr(t['tax'])}. Cess 4% = {inr(t['cess'])}. Total tax = {inr(t['total'])}.")
+    return (f"Slab tax: {slab_lines(taxable, SLABS)} = {inr(t['tax'])}. Cess 4% = {inr(t['cess'])}. Total tax = {inr(t['total'])}.")
+
+
+def calc_tds_professional(q: str) -> str | None:
+    """TDS on a professional fee when the invoice shows GST separately: the base leaves GST out (Circular 23/2017)."""
+    low = q.lower()
+    if "tds" not in low or not re.search(r"professional|consultan|194j", low):
+        return None
+    if re.search(r"contractor|technical|rent|commission|salary|director|royalty", low) or _AFTER_APR_2026.search(low):
+        return None
+    if "gst" not in low or "separate" not in low:
+        return None
+    fee = _near(q, ("professional fee", "consultancy fee", "fee"), 40)
+    if not fee or fee < 50_000:                      # below the Rs 50,000 threshold, or no fee read
+        return None
+    gst = _near(q, ("gst of",), 20) or _near(q, ("gst",), 25)
+    rate = re.search(r"(\d+(?:\.\d+)?)\s*%\s*gst|gst\s*(?:@|at)?\s*(\d+(?:\.\d+)?)\s*%", low)
+    if not gst and rate:
+        gst = rup(Decimal(fee) * Decimal(rate.group(1) or rate.group(2)) / 100)
+    if not gst or gst > fee * 3 // 10:               # GST above 30% of the fee means a wrong amount was read
+        return None
+    tds = rup(Decimal(fee) * 10 / 100)
+    total = fee + gst
+    return (f"TDS under Section 194J on professional fees is 10%. Because GST is shown separately in the invoice, the base is the fee "
+            f"excluding GST (CBDT Circular 23/2017). Base = {inr(fee)}; TDS = {inr(fee)} x 10% = {inr(tds)}. "
+            f"Invoice total = {inr(fee)} + {inr(gst)} GST = {inr(total)}; pay {inr(total - tds)} after deducting TDS.")
+
+
+def calc_bonus_tds(q: str) -> str | None:
+    """Extra annual tax caused by a bonus, new regime FY 2025-26: tax with the bonus minus tax without it."""
+    low = q.lower()
+    if "bonus" not in low or "new regime" not in low or "old regime" in low or _AFTER_APR_2026.search(low):
+        return None
+    if not re.search(r"extra (tds|tax)|additional (tds|tax)|tds (on|because of|due to) (the )?bonus|tax on (the )?bonus", low):
+        return None
+    bonus = _near(q, ("bonus of", "bonus"), 30)
+    salary = _near(q, ("salary is", "salary of", "salary"), 40)
+    if not bonus or not salary or bonus == salary or salary + bonus < 300_000:
+        return None
+    t0, t1 = new_regime_tax(salary - 75_000), new_regime_tax(salary + bonus - 75_000)
+    return (f"The bonus is added to the estimated annual salary. Without the bonus: taxable {inr(salary - 75_000)}, tax {inr(t0['tax'])} "
+            f"+ cess {inr(t0['cess'])} = {inr(t0['total'])}. With the bonus: taxable {inr(salary + bonus - 75_000)}, tax {inr(t1['tax'])} "
+            f"+ cess {inr(t1['cess'])} = {inr(t1['total'])}. Extra tax because of the bonus = {inr(t1['total'] - t0['total'])}. "
+            f"It is recovered through the estimated-annual-income TDS, not as a flat rate on the bonus.")
+
+
+def calc_prev_employer(q: str) -> str | None:
+    """Full-year new-regime tax for a mid-year joiner whose previous employer's salary is on Form 12B (FY 2025-26)."""
+    low = q.lower()
+    if not ("12b" in low or "previous employer" in low) or "new regime" not in low or "old regime" in low:
+        return None
+    if not any(w in low for w in ("tax", "tds")) or _AFTER_APR_2026.search(low):
+        return None
+    j = _date_after(q, ("joined",), 25)
+    if not j or j[0] != 1 or (j[2] not in (None, 2025) and not (j[2] == 2026 and j[1] <= 3)):
+        return None
+    m = re.search(r"(?:rs\.?\s*)?(\d[\d,]*)\s*(?:a|per)\s*month", low)
+    prev = _near(q, ("12b", "previous employer"), 45)
+    if not m or not prev:
+        return None
+    monthly, month = int(m.group(1).replace(",", "")), j[1]
+    months = 16 - month if month >= 4 else 4 - month
+    if monthly < 5_000 or months < 1:
+        return None
+    gross = prev + monthly * months
+    taxable = gross - 75_000
+    return (f"Add the previous employer's salary from Form 12B: {inr(prev)} + {inr(monthly)} x {months} months = {inr(gross)}. "
+            f"The Rs 75,000 standard deduction is allowed once for the year: taxable = {inr(gross)} - Rs 75,000 = {inr(taxable)}. "
+            + _nr_text(taxable))
+
+
+_FINANCIAL = re.compile(r"nbfc|non[- ]?bank|bank|insurer|insurance|financial institution|finance company", re.I)
+
+
+def _labelled_dates(q: str) -> dict:
+    """{'service': (d, m, y|None), 'invoice': ..., 'payment': ...}: each date is labelled by the words just before it."""
+    out, prev_end = {}, 0
+    for m in _DATE.finditer(q):
+        seg = q[max(prev_end, m.start() - 45):m.start()].lower()
+        if re.search(r"payment|paid|received|advance", seg):
+            lab = "payment"
+        elif re.search(r"invoice|bill", seg):
+            lab = "invoice"
+        elif re.search(r"service|completed|rendered|renders|provided|supply|finished|\bdone\b|\bwork\b", seg):
+            lab = "service"
+        else:
+            lab = None
+        if lab and lab not in out:
+            out[lab] = (int(m.group(1)), _MONTHS[m.group(2).lower()], int(m.group(3)) if m.group(3) else None)
+        prev_end = m.end()
+    return out
+
+
+def _resolve_dates(labelled: dict):
+    """Real dates for the labelled ones; a year the question leaves out is assumed only to do the day count."""
+    import datetime
+    base = next((p[2] for p in labelled.values() if p[2]), 2026)
+    out = {}
+    for lab in ("service", "invoice", "payment"):
+        if lab in labelled:
+            d = _to_date(labelled[lab], labelled[lab][2] or base)
+            if not d:
+                return None
+            if "service" in out and d < out["service"] and not labelled[lab][2]:
+                d = _to_date(labelled[lab], base + 1) or d
+            out[lab] = d
+    return out
+
+
+def _fmt(d, show_year: bool) -> str:
+    return f"{d.day} {d.strftime('%b')}" + (f" {d.year}" if show_year else "")
+
+
+def calc_invoice_deadline(q: str) -> str | None:
+    """Rule 47: the invoice for a service is due within 30 days of the service (45 days for banks, NBFCs and insurers)."""
+    import datetime
+    low = q.lower()
+    if "invoice" not in low or not re.search(r"\blate\b|within|on time|in time|deadline|too late", low):
+        return None
+    lab = _labelled_dates(q)
+    if "service" not in lab or "invoice" not in lab:
+        return None
+    d = _resolve_dates(lab)
+    if not d:
+        return None
+    limit = 45 if _FINANCIAL.search(low) else 30
+    deadline = d["service"] + datetime.timedelta(days=limit)
+    gap = (d["invoice"] - d["service"]).days
+    if gap < 0 or gap > 400:
+        return None
+    yr = bool(lab["service"][2] or lab["invoice"][2])
+    who = "banks, NBFCs and other financial institutions" if limit == 45 else "other service providers"
+    head = (f"Rule 47 of the CGST Rules requires the invoice for services within {limit} days of the service for {who} "
+            f"(30 days for others, 45 days for banks, NBFCs and insurers). Service on {_fmt(d['service'], yr)} + {limit} days = "
+            f"{_fmt(deadline, yr)}. The invoice on {_fmt(d['invoice'], yr)} is {gap} days after the service, so ")
+    if gap <= limit:
+        return head + "it is not late."
+    return head + f"it is late by {gap - limit} days. A late invoice makes the date of the service (or an earlier payment) the time of supply."
+
+
+def calc_time_of_supply(q: str) -> str | None:
+    """Time of supply for services (Section 13(2) CGST Act): depends on whether the invoice came within the Rule 47 period."""
+    import datetime
+    low = q.lower()
+    if not re.search(r"time of supply|which date decides|return period|liability", low) or "invoice" not in low:
+        return None
+    if not re.search(r"service|completed|rendered|provided|finished|\bdone\b|\bwork\b", low):
+        return None
+    lab = _labelled_dates(q)
+    if "service" not in lab or "invoice" not in lab:
+        return None
+    d = _resolve_dates(lab)
+    if not d:
+        return None
+    limit = 45 if _FINANCIAL.search(low) else 30
+    gap = (d["invoice"] - d["service"]).days
+    if gap < 0 or gap > 400:
+        return None
+    pay = d.get("payment")
+    yr = any(p[2] for p in lab.values())
+    late = gap > limit
+    if late:
+        tos = min(d["service"], pay) if pay else d["service"]
+        why = (f"The invoice was issued {gap} days after the service, beyond the {limit}-day period, so the time of supply is the "
+               f"earlier of the date of the service and the date of payment" + (f" ({_fmt(pay, yr)})" if pay else "") + ".")
+    else:
+        if not pay:
+            return None                              # on time and no payment date: the invoice date decides, nothing to compute
+        tos = min(d["invoice"], pay)
+        why = (f"The invoice was issued within {limit} days, so the time of supply is the earlier of the invoice date "
+               f"and the payment date ({_fmt(pay, yr)}).")
+    month = tos.strftime("%B") + (f" {tos.year}" if yr else "")
+    return (f"Time of supply of services under Section 13(2) of the CGST Act: {why} Here it is {_fmt(tos, yr)}. "
+            f"The tax goes in the {month} return (GSTR-1 and GSTR-3B), even if the invoice or payment comes later.")
+
+
+SPECIALISTS = (calc_late_fee, calc_rule37, calc_old_regime_tax, calc_hra, calc_new_regime_marginal,
+               calc_tds_professional, calc_bonus_tds, calc_prev_employer, calc_invoice_deadline, calc_time_of_supply)
 
 
 # Wording that means the question is not the plain textbook case, so a single formula would mislead
