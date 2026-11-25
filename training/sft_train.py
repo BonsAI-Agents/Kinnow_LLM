@@ -42,6 +42,33 @@ MAX_SEQ_LENGTH = 1024
 RESPONSE_TEMPLATE = "<|im_start|>assistant\n"
 
 
+def patch_loss_device() -> None:
+    """transformers 4.51 (needed for Qwen3) divides the loss by num_items_in_batch, a tensor on GPU 0, while the
+    loss sits on the last GPU when the model is split across two cards (device_map="auto"). That crashes with
+    "Expected all tensors to be on the same device". Move the count to the loss's device. Does nothing when the
+    function is missing (other transformers versions)."""
+    try:
+        import torch
+        import transformers.loss.loss_utils as lu
+    except Exception:  # noqa: BLE001
+        return
+    original = getattr(lu, "fixed_cross_entropy", None)
+    if original is None:
+        return
+
+    def fixed_cross_entropy(source, target, *args, **kwargs):
+        if torch.is_tensor(kwargs.get("num_items_in_batch")):
+            kwargs["num_items_in_batch"] = kwargs["num_items_in_batch"].to(source.device)
+        elif args and torch.is_tensor(args[0]):
+            args = (args[0].to(source.device),) + args[1:]
+        return original(source, target, *args, **kwargs)
+
+    lu.fixed_cross_entropy = fixed_cross_entropy
+
+
+patch_loss_device()
+
+
 def load_jsonl(path: str) -> list[dict]:
     with open(path, encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
