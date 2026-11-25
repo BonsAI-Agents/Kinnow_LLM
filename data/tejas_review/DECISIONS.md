@@ -23,8 +23,17 @@ A short log of points where sources disagreed and who settled them, so the train
 - The 24 Nov 2026 entries come from tax blogs, advisory sites and law-firm updates, not from the gazette or the official portals.
   Treat them as a good first answer and have a CA confirm before the data is used for anything outside this project.
 
-## Still open
-- Karnataka professional tax slabs (no training row uses them). The women's Maharashtra threshold is now sourced from the web only; check the official schedule.
+## Owner's decision, 25 Nov 2026: treat the CA points as settled by web research, for now
+The owner asked that the points that needed a CA be **treated as settled according to the web research results** until a CA says otherwise. This is the owner's decision to accept web research. **It is not a statement from a CA**, and nothing here should be shown to anyone as CA-verified. How each point is handled:
+- **Interest on ITC wrongly availed and utilised:** 18%, labelled Section 50(3) as before (see the 24 Nov entry for the risk that 24% or Section 50(1) is the right label).
+- **Maharashtra professional tax, women:** nil up to Rs 25,000 a month, then Rs 200 a month and Rs 300 in February (web sources agree; the official schedule was not read).
+- **Post-supply discounts after 1 Nov 2026:** the prior-agreement condition is gone from 1 Nov 2026. Web research did not settle which date decides it or whether the buyer must still reverse the credit, so the data **states neither**. The held rows stay held.
+- **Meal vouchers, new regime:** web sources disagree, so the data **states neither** way.
+- **Karnataka professional tax:** no training row uses it, so it stays out.
+
+If a CA later gives a different answer, change the places listed in the table above and retrain.
+
+## Still open (not settled even by web research)
+- Which date decides a post-supply discount (supply or credit note), and whether the buyer must still reverse the credit.
 - Whether the new tax regime allows the meal-voucher exemption.
-- Whether the recipient must still reverse ITC on a post-supply discount after 1 Nov 2026, and which date decides it (supply or credit note).
-- The section and rate for interest on ITC wrongly availed and utilised (18% under Section 50(1) versus 24% under Section 50(3)). Closed for now by the owner's decision of 24 Nov 2026 to rely on web research; web research alone does not settle it, so a CA's written ruling would still be better.
+- A written CA ruling on all the points above, whenever one is available.

@@ -9,6 +9,9 @@ Built to the blueprint in `kinnow-production-plan-v1.md`.
 > 📖 **New to this codebase?** Start with **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — a complete
 > walkthrough of the request flow, all four guardrail layers, the training pipeline, the ops
 > surface, and the known sharp edges.
+>
+> 📈 **Where does the project stand?** See **[`PROGRESS_REPORT.md`](PROGRESS_REPORT.md)**: every version
+> from v1 to now, the data used, the features built, the scores, and what is still open.
 
 | Target | Value |
 |---|---|
