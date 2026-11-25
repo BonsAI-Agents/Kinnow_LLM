@@ -42,7 +42,8 @@ BASE = os.getenv("BASE", "Qwen/Qwen2.5-7B-Instruct")
 MAX_STEPS = os.getenv("MAX_STEPS", "600")
 SEED = os.getenv("SEED", "42")
 FLAGS = os.getenv("FLAGS", "--rag 4 --hybrid --calc --cite")
-HF_REPO = f"{HF_USER}/kinnow-{VERSION}-qwen25"
+IS_QWEN3 = "qwen3" in BASE.lower()
+HF_REPO = f"{HF_USER}/kinnow-{VERSION}-{'qwen3' if IS_QWEN3 else 'qwen25'}"
 STARTED = time.time()
 
 
@@ -72,6 +73,9 @@ if not os.path.exists(PY):
     sh("uv pip install -q --python " + PY + " -r training/requirements-train.txt")
     sh("uv pip install -q --python " + PY + " setuptools wheel rich 'datasets==2.21.0' 'pyarrow==17.0.0'")
     sh("uv pip install -q --python " + PY + " 'sentence-transformers==3.2.1'")   # the lookup's embedding model
+    if IS_QWEN3:
+        # transformers 4.46.1 (the pinned version) does not know the qwen3 model type; 4.51 is the first release that does
+        sh("uv pip install -q --python " + PY + " 'transformers==4.51.3'")
 
 # 2. data and lookup notes
 sh(PY + " scripts/merge_tejas_data.py > /dev/null")

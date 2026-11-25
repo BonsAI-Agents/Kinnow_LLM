@@ -37,7 +37,7 @@ PY = W + "/venv/bin/python"
 ADAPTER = os.getenv("ADAPTER", "KaraPatelDev/kinnow-v4-qwen25-sft-adapter")
 FLAGS = os.getenv("FLAGS", "--rag 4 --hybrid --calc --cite")
 TAG = os.getenv("TAG", "v4-new")
-BASE = "Qwen/Qwen2.5-7B-Instruct"
+BASE = os.getenv("BASE", "Qwen/Qwen2.5-7B-Instruct")
 STARTED = time.time()
 
 
