@@ -18,7 +18,8 @@ Disputed legal points and who settled them are logged in [`data/tejas_review/DEC
 9. [Infrastructure](#9-infrastructure)
 10. [Problems and lessons](#10-problems-and-lessons)
 11. [Pending and blocked](#11-pending-and-blocked)
-12. [Next options](#12-next-options)
+12. [What to do next, in order](#12-what-to-do-next-in-order)
+13. [The honest picture](#13-the-honest-picture)
 
 ---
 
@@ -44,7 +45,8 @@ Disputed legal points and who settled them are logged in [`data/tejas_review/DEC
 | Fact check, with lookup | n/a | 48 of 50 | 47 of 50 |
 | Fact check, without lookup | n/a | 34 of 50 | **37 of 50** |
 
-- **Code:** on `main` (scripts pushed up to commit `65bbf54`).
+- **Code:** on `main`, pushed, commit `5d45cac`.
+- **Calculators added after v6q3:** six new or fixed calculators are pushed but have not been scored in any run yet (see section 3).
 - **Kaggle:** session off, about 1 hour of the weekly quota left.
 - **Latest run (v6q3):** the first run on Qwen3-8B. It is clearly better than v5 and is the best result so far.
 - **Model files:** the Qwen3-8B adapter should be in the private Hugging Face repo `KaraPatelDev/kinnow-v6q3-qwen3-sft-adapter` (not yet confirmed). The Kaggle copy and result files were wiped when the session was powered off.
@@ -100,7 +102,7 @@ Disputed legal points and who settled them are logged in [`data/tejas_review/DEC
 - Five new calculators (late fee, Rule 37, old-regime tax, HRA, marginal relief): **59.9%**.
 - Calculator wording fixes (section reference, slab breakdown, EPF split): **61.5%**.
 
-### v5: newest training run
+### v5: retrained on the new data
 - **Data:** 2,909 rows (v4's 2,691 plus 100 checked, 47 verified and 80 glossary rows, minus rows held back).
 - **Settings:** seed 7, 600 steps.
 - **Score:** **62.0%**, which is no real change: 61.5 to 62.0 is inside the noise.
@@ -115,6 +117,26 @@ Disputed legal points and who settled them are logged in [`data/tejas_review/DEC
 - **Fact check:** 47 of 50 with the lookup (missed hotel rate, rebate 87A, meal voucher) and 37 of 50 without (v5: 48 and 34).
 - **Reading it:** the gain is 4.7 points (about 9 of 192 questions), larger than the roughly 3-point run-to-run noise, but it is one run. GST and Hindi moved most.
 - **Targets:** none of the topic or overall targets are met. GST is 4 points short, Payroll 20 short, Invoice 28 short.
+
+**v6q3: what is not yet confirmed**
+- **The adapter's location.** It should be in the private Hugging Face repo `KaraPatelDev/kinnow-v6q3-qwen3-sft-adapter` (training reported TRAIN DONE). It was not checked, and the Kaggle copy was wiped when the session was powered off.
+- **Serving.** The server loads whatever `MODEL_NAME` points to in vLLM, and already sends `enable_thinking: false`. Serving Qwen3-8B plus this adapter has not been tested.
+- **Run-to-run noise.** There is one run. A second seed would show how much of the 4.7-point gain is chance.
+- **Untrained Qwen3-8B baseline.** Skipped to save quota, so how much training added on top of the model is unknown.
+- **Result files.** The scores above were read from the run before the session was powered off. The full answer files are gone, so the per-question failures of v6q3 cannot be listed.
+
+### After v6q3: new calculators (25 Nov 2026, pushed as `5d45cac`)
+The server uses these at answer time, so no retraining is needed, but they only reach the live product after the next deploy. They are not in any scored run yet.
+- **ESI fix:** reads "23k gross" (amount before the word), applies the Rs 21,000 ceiling, and stays silent if a disability is mentioned.
+- **TDS on a professional fee:** 10% on the fee excluding GST when GST is shown separately (Circular 23/2017). Example: fee Rs 1,35,000 gives TDS Rs 13,500, pay Rs 1,45,800.
+- **Extra tax from a bonus:** tax with the bonus minus tax without it, new regime FY 2025-26. Example: Rs 2L bonus on Rs 18L salary gives Rs 41,600.
+- **Previous employer (Form 12B):** adds the earlier salary, applies the standard deduction once. Example: taxable Rs 11,25,000, tax nil.
+- **Invoice deadline (Rule 47):** 30 days, or 45 for banks, NBFCs and insurers.
+- **Time of supply for services (Section 13(2)):** which date decides and which return the tax goes in.
+- **Safety:** each stays silent when a date or amount is missing, for tax year 2026-27 (rules unsettled), or when an amount looks wrong.
+- **Checks:** 18 new tests, written first from the failing questions. All 192 golden questions were compared before and after: exactly the 7 targeted ones change, none of the other 185 do. Reworded questions with different numbers were also tested, which found and fixed two narrow triggers.
+- **A caution on the score:** the calculators were built from the same questions that sit in the golden test set, so any gain there will look bigger than the real gain. Tejas's review of real answers is the better measure.
+- **Not covered:** the mistakes that need knowledge, not arithmetic (composite AC rate, GSTR-1A, the SUV 40% slab, ITC timing, Section 192/24Q, final-settlement TDS). They need verified lookup notes.
 
 ## 4. Training data used
 - **Our own v1 rows:** the original base set, kept unless they conflicted with Tejas's.
@@ -138,7 +160,7 @@ Disputed legal points and who settled them are logged in [`data/tejas_review/DEC
 - **Rule lookup:** before answering, finds the 4 best-matching approved notes and shows them to the model.
 - **Better lookup:** searches by words and by meaning, then merges the lists.
 - **Sources line:** adds "Sources: Section 16(2)(aa), Rule 37", using only references found in the notes.
-- **Calculators:** gratuity, EPF, ESI, new-regime tax, interest, GST late fee, Rule 37, old-regime tax, HRA and 87A marginal relief.
+- **Calculators:** gratuity, EPF, ESI, new-regime tax, interest, GST late fee, Rule 37, old-regime tax, HRA and 87A marginal relief. Added on 25 Nov 2026: TDS on a professional fee excluding GST, extra tax from a bonus, previous-employer (Form 12B) full-year tax, the Rule 47 invoice deadline and the Section 13(2) time of supply, plus a fix so ESI reads "23k gross".
 - **Calculator safety:** each has a strict trigger and stays silent when unsure. A misfire on non-salary tax questions was found and fixed.
 - **Server wiring:** everything above plugs in through `AnswerSupport`. Each part can be switched off and falls back if anything fails.
 
@@ -150,6 +172,7 @@ Disputed legal points and who settled them are logged in [`data/tejas_review/DEC
 - **Compare table:** puts runs side by side.
 - **Failure analysis:** sorted failures into wording-only, real mistakes and unclear.
 - **Review materials for Tejas:** a 50-answer review sheet (answer key kept private) and a list of 28 likely mistakes.
+- **Researched verdicts on the 28 mistakes** (`data/review/real_mistakes_researched.md`, local only): see section 7.
 
 ## 7. Data checking and research
 - **Intake script** (`scripts/ingest_new_batches.py`): checks format, repeats, overlap with the test set, the old 24% rate and "check" rows.
@@ -158,6 +181,9 @@ Disputed legal points and who settled them are logged in [`data/tejas_review/DEC
 - **Second sample of 100 rows:** 47% needed a fix or a drop (stricter standard).
 - **Knowledge notes:** each checked, 56 kept.
 - **Assembly script** (`scripts/assemble_new_batches.py`): builds the final files from the batches, the verdicts and the overrides.
+- **Web research on the 28 likely model mistakes (25 Nov 2026):** four research agents checked seven each. Result: 19 model mistakes, 9 fine (only wording differed), 0 where our reference answer was wrong. Confidence: 16 high, 11 medium, 1 low.
+- **How far to trust it:** every calculation was recomputed independently and matches (tax slabs, late-fee day counts, the Rule 37 reversal of Rs 55,350, the NBFC 45-day limit). The legal rules mostly rest on secondary sources (tax blogs, advisory sites), because few official pages could be opened in full. These verdicts are not a CA's or Tejas's judgement.
+- **Where the 19 mistakes sit:** 5 already had calculators (late fees, Rule 37, marginal relief, old-regime tax); 7 more are now covered by the new calculators (ESI, 194J TDS, bonus, Form 12B, invoice deadline, two time-of-supply questions); the last 7 need verified lookup notes. The mistakes come from an older run (v4), so Qwen3-8B may already have fixed some.
 
 ## 8. Legal points researched
 These come from web sources (tax blogs, advisory sites, law-firm updates), not from official texts. Full log: `data/tejas_review/DECISIONS.md`.
@@ -174,7 +200,9 @@ These come from web sources (tax blogs, advisory sites, law-firm updates), not f
 - **Runbook notebook** (`notebooks/kinnow_kaggle_runbook.ipynb`): plain language, with a "what this does" box per cell.
 - **Models:** adapters are stored in private Hugging Face repos.
 - **Prompts for Tejas:** two data-generation prompts (`data/tejas_review/`).
-- **Tests:** 337 unit tests passed on the last full run.
+- **Tests:** the last full run passed 358 unit tests. Two more were added afterwards, and they pass with the calculator and answer-support tests.
+- **Qwen3-8B job:** the same Kaggle script trains it when `BASE=Qwen/Qwen3-8B` is set. It installs `transformers` 4.51.3 for that case and names the Hugging Face repo `kinnow-<version>-qwen3`, so the Qwen2.5 adapters are not touched.
+- **Kaggle limits:** 30 GPU hours a week, a 12-hour session, shutdown after about 40 minutes without interaction. A 10-minute check kept the Qwen3 run alive. The Qwen3-8B run used about 5 hours of training plus about 1 hour 15 minutes of scoring and fact check.
 
 ## 10. Problems and lessons
 - **v1 end-marker bug:** fixed.
@@ -190,13 +218,36 @@ These come from web sources (tax blogs, advisory sites, law-firm updates), not f
 - **Tejas:** the 50-answer review, his own verdicts on the 28 likely mistakes (web-research verdicts are in `data/review/real_mistakes_researched.md`: 19 model mistakes, 9 fine), and his spot-check count.
 - **Open legal points:** treated as settled by web research (the owner's decision, not a CA statement), except the post-supply discount date test and meal-voucher regime eligibility, which stay unstated. See `DECISIONS.md`.
 - **Bigger-model (14B) run:** approved, but it needs about 10–11 GPU hours and the weekly quota is nearly used.
-- **Qwen3-8B adapter:** confirm it is in the private Hugging Face repo.
+- **Qwen3-8B adapter:** confirm it is in the private Hugging Face repo, and test serving it (base model plus adapter through vLLM).
+- **Knowledge-type mistakes:** composite AC rate, GSTR-1A, SUV 40% slab, ITC timing, Section 192/24Q and final-settlement TDS still need verified lookup notes.
 - **Repo is public:** to be made private when the owner decides.
 - **Unchecked data:** 311 rows not yet verified.
+- **Local-only files:** `data/review/` (including the researched verdicts), `data/tejas_review/PROMPT_*` and the other untracked files are not on GitHub.
+- **Kaggle quota:** about 1 hour left this week, so no full training run can start until the weekly reset.
+- **Draft notebook:** the Kaggle control notebook has a few stray cells left from typing mistakes. It is only a draft and can be cleaned.
 
-## 12. Next options
-- **Extend the calculators and add training examples for the 19 confirmed model mistakes** (late fees, Rule 37, marginal relief, TDS). No GPU needed to build them.
-- **After the weekly Kaggle reset:** retrain Qwen3-8B on the improved data, or try the 14B model.
-- **Pay for faster hardware** (for example Colab Pro).
-- **Preference training (DPO)**, which needs approval.
-- **Get Tejas's review** to learn the real accuracy and whether the target needs adjusting.
+## 12. What to do next, in order
+
+**A. Now, no GPU needed**
+1. **Confirm the Qwen3-8B adapter** is in the private Hugging Face repo. It protects the 5 hours of training.
+2. **Send Tejas** `review_sheet_for_tejas.csv`, `README_FOR_TEJAS.md` and `real_mistakes_for_tejas.md` (never the KEY file). His marks show the real accuracy, which the automatic scorer cannot.
+3. **Write verified lookup notes** for the knowledge-type mistakes listed in section 11.
+4. **Improve the weak topics' data:** check the 311 unchecked rows or generate more Payroll and Invoice examples. These are the topics furthest from target.
+5. **Test serving** Qwen3-8B plus the adapter, so a switch is not a surprise later.
+
+**B. After the weekly Kaggle reset**
+6. **Train v7 on Qwen3-8B** with the improved data (about 6 hours, one run per week of quota). A second seed, if quota allows, shows how much chance matters.
+7. **Score it with the new calculators on,** and compare with v6q3 (66.7%) to see what the data and calculators added.
+
+**C. Decisions for the owner**
+8. **Make Qwen3-8B the base for future runs.** Recommended.
+9. **A bigger model (14B) or preference training (DPO)** are expensive. Only worth it if v7 still falls far short. DPO needs approval.
+10. **Faster hardware** (for example Colab Pro) would remove the weekly quota limit.
+11. **Make the GitHub repo private** when ready.
+
+## 13. The honest picture
+- **Progress:** 22.9% untrained to 66.7% now. The biggest single jump after the first training came from changing the base model (+4.7 points), while adding more of the same data gave little.
+- **Gap:** the overall target is 78% and none of the topics is there. Payroll (62 against 82) and Invoice (57.7 against 86) are far away.
+- **Likeliest gains:** more accurate data and calculators aimed at specific mistakes, and Tejas's review of real answers.
+- **Realistic target:** reaching 78% in every topic may need a larger model, or a target adjusted to what Tejas's review shows is achievable.
+- **Trust in the numbers:** one run per model, a roughly 3-point run-to-run noise, a scorer that checks for required words, and a test set that some calculators were built from. Treat small differences with caution.
