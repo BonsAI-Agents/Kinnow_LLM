@@ -235,7 +235,7 @@ def main():
         bf16=use_bf16,
         gradient_checkpointing=True,
         logging_steps=10,
-        evaluation_strategy="steps",
+        eval_strategy="steps",   # new name (transformers 4.41+); transformers 4.51 for Qwen3 rejects the old evaluation_strategy
         eval_steps=100,
         save_strategy="steps",
         save_steps=100,
